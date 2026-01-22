@@ -1,4 +1,5 @@
-from flask import Blueprint
+from flask import Blueprint, jsonify, request
+from http import HTTPStatus
 from services.colli_service import ColliService
 
 
@@ -8,29 +9,41 @@ colli_service = ColliService()
 
 @colli_bp.get('')
 def get_all_collis():
-    data_from_service = colli_service.get_all_collis()
-    return data_from_service
+    collis = colli_service.get_all_collis()
+    return jsonify(collis), HTTPStatus.OK
 
 
 @colli_bp.post('')
 def create_colli():
-    data_from_service = colli_service.create_colli()
-    return data_from_service
+    data = request.get_json()
+    new_colli = colli_service.create_colli(data)
+    return jsonify(new_colli), HTTPStatus.CREATED
 
 
-@colli_bp.get('/<int:colli_id>')
+@colli_bp.get('/<string:colli_id>')
 def get_colli_by_id(colli_id):
-    data_from_service = colli_service.get_colli_by_id(colli_id)
-    return data_from_service
+    colli = colli_service.get_colli_by_id(colli_id)
+    if not colli:
+        return jsonify({'message': 'Colli not found'}), HTTPStatus.NOT_FOUND
+    return jsonify(colli), HTTPStatus.OK
 
 
-@colli_bp.put('/<int:colli_id>')
+@colli_bp.put('/<string:colli_id>')
 def update_colli(colli_id):
-    data_from_service = colli_service.update_colli(colli_id)
-    return data_from_service
+    data = request.get_json()
+    updated_colli = colli_service.update_colli_by_id(colli_id, data)
+    
+    if not updated_colli:
+        return jsonify({'error': 'Colli not found'}), HTTPStatus.NOT_FOUND
+    
+    return jsonify(updated_colli), HTTPStatus.OK
 
 
-@colli_bp.delete('/<int:colli_id>')
+@colli_bp.delete('/<string:colli_id>')
 def delete_colli(colli_id):
-    data_from_service = colli_service.delete_colli(colli_id)
-    return data_from_service
+    success = colli_service.delete_colli_by_id(colli_id)
+    
+    if not success:
+        return jsonify({'error': 'Colli not found'}), HTTPStatus.NOT_FOUND
+    
+    return '', HTTPStatus.NO_CONTENT

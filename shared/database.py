@@ -14,6 +14,7 @@ def init_database(app):
         #import models here to create tables
         from models.user_model import User
         from models.colli_model import Colli
+        from models.colli_member_model import ColliMember
         
         db.create_all()
-        print(f"Base de données et tables initialisées: {app.config['SQLALCHEMY_DATABASE_URI']}")
+        print(f"<Dev>Base de données et tables initialisées: {app.config['SQLALCHEMY_DATABASE_URI']}")

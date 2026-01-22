@@ -19,6 +19,8 @@ class ColliService:
             name=data.get('name'),
             theme=data.get('theme'),
             description=data.get('description'),
+            creator_id=data.get('creator_id'),
+            status=data.get('status')
         )
         
         saved_colli = self.colli_repository.save(new_colli)
@@ -41,6 +43,8 @@ class ColliService:
         if 'name' in data: colli.name = data.get('name')
         if 'theme' in data: colli.theme = data.get('theme')
         if 'description' in data: colli.description = data.get('description')
+        if 'creator_id' in data: colli.creator_id = data.get('creator_id')
+        if 'status' in data: colli.status = data.get('status')
         
         return ColliDTO(self.colli_repository.save(colli)).to_json()
     

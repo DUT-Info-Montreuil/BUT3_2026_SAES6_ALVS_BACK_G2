@@ -1,30 +1,55 @@
-#colli service in development
-# --- IGNORE ---
+from models.colli_model import Colli
+from repositories.colli_repository import ColliRepository
+from dtos.colli_dto import ColliDTO
 
 
 class ColliService:
     
     def __init__(self):
-        # colli_repository = ColliRepository()
-        pass
+        self.colli_repository = ColliRepository()
     
     
     def get_all_collis(self):
-        return {"message": "Get all collis - Not implemented in service layer yet"}
+        collis = self.colli_repository.get_all_collis()
+        return ColliDTO.from_list(collis)
     
     
-    def create_colli(self):
-        return {"message": "Create colli - Not implemented in service layer yet"}
+    def create_colli(self, data):
+        new_colli = Colli(
+            name=data.get('name'),
+            theme=data.get('theme'),
+            description=data.get('description'),
+        )
+        
+        saved_colli = self.colli_repository.save(new_colli)
+        
+        return ColliDTO(saved_colli).to_json()
     
     
     def get_colli_by_id(self, colli_id):
-        return {"message": f"Get colli by id {colli_id} - Not implemented in service layer yet"}
+        colli = self.colli_repository.get_colli_by_id(colli_id)
+        if not colli:
+            return None
+        return ColliDTO(colli).to_json()
     
     
-    def update_colli_by_id(self, colli_id):
-        return {"message": f"Update colli by id {colli_id} - Not implemented in service layer yet"}
+    def update_colli_by_id(self, colli_id, data):
+        colli = self.colli_repository.get_colli_by_id(colli_id)
+        if not colli:
+            return None
+
+        if 'name' in data: colli.name = data.get('name')
+        if 'theme' in data: colli.theme = data.get('theme')
+        if 'description' in data: colli.description = data.get('description')
+        
+        return ColliDTO(self.colli_repository.save(colli)).to_json()
     
     
     def delete_colli_by_id(self, colli_id):
-        return {"message": f"Delete colli by id {colli_id} - Not implemented in service layer yet"}
+        colli = self.colli_repository.get_colli_by_id(colli_id)
+        if not colli:
+            return False
+        
+        self.colli_repository.delete(colli)
+        return True 
     

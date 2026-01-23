@@ -3,7 +3,7 @@ class UserDTO:
         self.id = user.id
         self.username = user.username
         self.email = user.email
-        self.created_at = user.created_at.strftime("%d/%m/%Y %H:%M")
+        self.created_at = user.created_at.isoformat()
         
         
     def to_json(self):

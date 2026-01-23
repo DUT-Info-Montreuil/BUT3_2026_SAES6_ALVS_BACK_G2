@@ -11,7 +11,8 @@ class ColliMemberService:
     def add_member_to_colli(self, data):
         new_member = ColliMember(
             user_id=data.get('user_id'),
-            colli_id=data.get('colli_id')
+            colli_id=data.get('colli_id'),
+            role=data.get('role', 'member')
         )
         
         saved_member = self.colli_member_repository.save(new_member)
@@ -30,10 +31,20 @@ class ColliMemberService:
         return ColliMemberDTO(member).to_json()
     
     
-    def remove_member_from_colli(self, member_colli_id):
-        member = self.colli_member_repository.get_colli_member_by_id(member_colli_id)
+    def remove_member_from_colli(self, colli_member_id):
+        member = self.colli_member_repository.get_colli_member_by_id(colli_member_id)
         if not member:
             return False
         
         self.colli_member_repository.delete(member)
         return True
+    
+    
+    def update_member_role(self, colli_member_id, new_role):
+        member = self.colli_member_repository.get_colli_member_by_id(colli_member_id)
+        if not member:
+            return None
+        
+        member.role = new_role
+        updated_member = self.colli_member_repository.save(member)
+        return ColliMemberDTO(updated_member).to_json()

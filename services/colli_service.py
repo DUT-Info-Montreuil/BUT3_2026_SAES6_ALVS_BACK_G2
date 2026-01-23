@@ -1,12 +1,14 @@
 from models.colli_model import Colli
 from repositories.colli_repository import ColliRepository
 from dtos.colli_dto import ColliDTO
+from services.colli_member_service import ColliMemberService
 
 
 class ColliService:
     
     def __init__(self):
         self.colli_repository = ColliRepository()
+        self.colli_member_service = ColliMemberService()
     
     
     def get_all_collis(self):
@@ -56,4 +58,33 @@ class ColliService:
         
         self.colli_repository.delete(colli)
         return True 
+    
+    
+    def approve_colli(self, colli_id):
+        colli = self.colli_repository.get_colli_by_id(colli_id)
+        if not colli:
+            return None
+        
+        colli.status = 'active'
+        self.colli_repository.save(colli)
+        
+        colli_manager_data = {
+            'user_id': colli.creator_id,
+            'colli_id': colli.id,
+            'role': 'manager'
+        }
+        self.colli_member_service.add_member_to_colli(colli_manager_data)
+        
+        return ColliDTO(colli).to_json()
+    
+    
+    def reject_colli(self, colli_id):
+        colli = self.colli_repository.get_colli_by_id(colli_id)
+        if not colli:
+            return None
+        
+        colli.status = 'rejected'
+        self.colli_repository.save(colli)
+        
+        return ColliDTO(colli).to_json()
     

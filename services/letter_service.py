@@ -1,6 +1,7 @@
 from models.letter_model import Letter
 from repositories.letter_repository import LetterRepository
 from dtos.letter_dto import LetterDTO
+from shared.socketio import socketio
 
 
 class LetterService:
@@ -19,7 +20,11 @@ class LetterService:
         )
         
         saved_letter = self.letter_repository.save(new_letter)
-        return LetterDTO(saved_letter).to_json()
+        letter_dict = LetterDTO(saved_letter).to_json()
+        
+        socketio.emit('new_letter', letter_dict, room=data.get('colli_id'))
+        
+        return letter_dict
     
     
     def get_letter_by_id(self, letter_id):

@@ -12,3 +12,7 @@ class Config:
     
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SECRET_KEY = os.getenv('SECRET_KEY')
+    
+    UPLOAD_FOLDER = os.path.join(BASE_DIR, 'static/uploads')
+    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'mp3', 'wav', 'm4a', 'pdf'}
+    MAX_CONTENT_LENGTH = 16 * 1024 * 1024

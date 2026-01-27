@@ -3,6 +3,8 @@ from http import HTTPStatus
 from services.colli_service import ColliService
 from services.colli_member_service import ColliMemberService
 from services.letter_service import LetterService
+from services.comment_service import CommentService
+from services.file_service import FileService
 
 
 colli_bp = Blueprint('colli', __name__)
@@ -10,6 +12,8 @@ colli_bp = Blueprint('colli', __name__)
 colli_service = ColliService()
 colli_member_service = ColliMemberService()
 letter_service = LetterService()
+comment_service = CommentService()
+file_service = FileService()
 
 
 @colli_bp.get('')
@@ -140,8 +144,13 @@ def update_member_role(colli_id, colli_member_id):
 
 @colli_bp.post('/<string:colli_id>/letters')
 def create_letter(colli_id):
-    data = request.get_json()
+    if request.is_json:
+        data = request.get_json()
+    else:
+        data = request.form.to_dict()
+        
     sender_id = data.get('sender_id')
+    file = request.files.get('file')
     
     if not colli_service.get_colli_by_id(colli_id):
         return jsonify({'error': 'Colli not found'}), HTTPStatus.NOT_FOUND
@@ -153,8 +162,16 @@ def create_letter(colli_id):
     if not is_member:
         return jsonify({'error': 'Sender is not a member of this colli'}), HTTPStatus.FORBIDDEN
     
+    file_info = None
+    
+    if file:
+        try:
+            file_info = file_service.upload_file(file, subfolder='letters')
+        except ValueError as e:
+            return jsonify({'error': str(e)}), HTTPStatus.BAD_REQUEST
+    
     data['colli_id'] = colli_id
-    new_letter = letter_service.create_letter(data)
+    new_letter = letter_service.create_letter(data, file_info=file_info)
     
     return jsonify(new_letter), HTTPStatus.CREATED
 
@@ -192,5 +209,66 @@ def delete_letter(colli_id, letter_id):
     success = letter_service.delete_letter_by_id(letter_id)
     if not success:
         return jsonify({'error': 'Failed to delete letter'}), HTTPStatus.INTERNAL_SERVER_ERROR
+    
+    return '', HTTPStatus.NO_CONTENT
+
+
+# --- Comment Endpoints --- #
+
+
+@colli_bp.post('/<string:colli_id>/letters/<string:letter_id>/comments')
+def add_comment_to_letter(colli_id, letter_id):
+    data = request.get_json()
+    sender_id = data.get('sender_id')
+    
+    if not colli_service.get_colli_by_id(colli_id):
+        return jsonify({'error': 'Colli not found'}), HTTPStatus.NOT_FOUND
+    
+    letter = letter_service.get_letter_by_id(letter_id)
+    if not letter or letter['colli_id'] != colli_id:
+        return jsonify({'error': 'Letter not found in this colli'}), HTTPStatus.NOT_FOUND
+    
+    if not sender_id:
+        return jsonify({'error': 'Sender ID is required'}), HTTPStatus.BAD_REQUEST
+    
+    is_member = colli_member_service.get_by_user_and_colli(sender_id, colli_id)
+    if not is_member:
+        return jsonify({'error': 'Sender is not a member of this colli'}), HTTPStatus.FORBIDDEN
+    
+    data['letter_id'] = letter_id
+    new_comment = comment_service.add_comment(data)
+    
+    return jsonify(new_comment), HTTPStatus.CREATED
+
+
+@colli_bp.get('/<string:colli_id>/letters/<string:letter_id>/comments')
+def get_comments_by_letter_id(colli_id, letter_id):
+    if not colli_service.get_colli_by_id(colli_id):
+        return jsonify({'error': 'Colli not found'}), HTTPStatus.NOT_FOUND
+    
+    letter = letter_service.get_letter_by_id(letter_id)
+    
+    if not letter or letter['colli_id'] != colli_id:
+        return jsonify({'error': 'Letter not found in this colli'}), HTTPStatus.NOT_FOUND
+    
+    comments = comment_service.get_comments_by_letter_id(letter_id)
+    
+    return jsonify(comments), HTTPStatus.OK
+
+
+@colli_bp.delete('/<string:colli_id>/letters/<string:letter_id>/comments/<string:comment_id>')
+def delete_comment(colli_id, letter_id, comment_id):
+    if not colli_service.get_colli_by_id(colli_id):
+        return jsonify({'error': 'Colli not found'}), HTTPStatus.NOT_FOUND
+    
+    letter = letter_service.get_letter_by_id(letter_id)
+    if not letter or letter['colli_id'] != colli_id:
+        return jsonify({'error': 'Letter not found in this colli'}), HTTPStatus.NOT_FOUND
+    
+    comment = comment_service.get_comment_by_id(comment_id)
+    if not comment or comment['letter_id'] != letter_id:
+        return jsonify({'error': 'Comment not found for this letter'}), HTTPStatus.NOT_FOUND
+    
+    comment_service.delete_comment_by_id(comment_id)
     
     return '', HTTPStatus.NO_CONTENT

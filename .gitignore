@@ -208,3 +208,6 @@ __marimo__/
 
 # data and logs
 data/
+
+# uploaded files
+static/

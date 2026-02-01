@@ -1,5 +1,5 @@
 # src/infrastructure/web/routes/colli_routes.py
-"""Routes pour les COLLIs avec injection de dépendances."""
+"""Routes pour les COLLIs avec documentation OpenAPI."""
 
 from flask import Blueprint, request, jsonify
 from http import HTTPStatus
@@ -38,7 +38,45 @@ colli_bp = Blueprint('collis', __name__, url_prefix='/api/v1/collis')
 def create_colli(
     use_case: CreateColliUseCase = Provide[Container.create_colli_use_case]
 ):
-    """Créer un nouveau COLLI."""
+    """
+    Créer un COLLI
+    ---
+    tags:
+      - COLLI
+    summary: Créer une nouvelle communauté littéraire
+    description: Crée un COLLI en statut 'pending' (nécessite approbation admin)
+    security:
+      - BearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [name, theme]
+            properties:
+              name:
+                type: string
+                example: "Correspondances Romantiques"
+              theme:
+                type: string
+                example: "Lettres d'amour du XIXe siècle"
+              description:
+                type: string
+    responses:
+      201:
+        description: COLLI créé
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Colli'
+      400:
+        $ref: '#/components/responses/ValidationError'
+      401:
+        $ref: '#/components/responses/Unauthorized'
+      403:
+        $ref: '#/components/responses/Forbidden'
+    """
     schema = CreateColliSchema()
     try:
         data = schema.load(request.get_json() or {})
@@ -63,7 +101,47 @@ def create_colli(
 def list_collis(
     use_case: ListCollisUseCase = Provide[Container.list_collis_use_case]
 ):
-    """Lister les COLLIs avec pagination."""
+    """
+    Lister les COLLIs
+    ---
+    tags:
+      - COLLI
+    summary: Récupérer la liste des COLLIs avec pagination
+    security:
+      - BearerAuth: []
+    parameters:
+      - name: page
+        in: query
+        schema:
+          type: integer
+          default: 1
+      - name: per_page
+        in: query
+        schema:
+          type: integer
+          default: 20
+          maximum: 100
+    responses:
+      200:
+        description: Liste paginée des COLLIs
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                items:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Colli'
+                total:
+                  type: integer
+                page:
+                  type: integer
+                per_page:
+                  type: integer
+      401:
+        $ref: '#/components/responses/Unauthorized'
+    """
     schema = ColliListQuerySchema()
     try:
         params = schema.load(request.args)
@@ -84,7 +162,33 @@ def get_colli(
     colli_id: UUID,
     use_case: GetColliByIdUseCase = Provide[Container.get_colli_use_case]
 ):
-    """Récupérer les détails d'un COLLI."""
+    """
+    Détails d'un COLLI
+    ---
+    tags:
+      - COLLI
+    summary: Récupérer les détails d'un COLLI
+    security:
+      - BearerAuth: []
+    parameters:
+      - name: colli_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      200:
+        description: Détails du COLLI
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Colli'
+      401:
+        $ref: '#/components/responses/Unauthorized'
+      404:
+        $ref: '#/components/responses/NotFound'
+    """
     user_id = get_current_user_id()
     result = use_case.execute(colli_id, user_id)
     return jsonify(result.to_dict()), HTTPStatus.OK
@@ -97,7 +201,31 @@ def delete_colli(
     colli_id: UUID,
     use_case: DeleteColliUseCase = Provide[Container.delete_colli_use_case]
 ):
-    """Supprimer un COLLI (créateur uniquement)."""
+    """
+    Supprimer un COLLI
+    ---
+    tags:
+      - COLLI
+    summary: Supprimer un COLLI (créateur uniquement)
+    security:
+      - BearerAuth: []
+    parameters:
+      - name: colli_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      204:
+        description: COLLI supprimé
+      401:
+        $ref: '#/components/responses/Unauthorized'
+      403:
+        $ref: '#/components/responses/Forbidden'
+      404:
+        $ref: '#/components/responses/NotFound'
+    """
     user_id = get_current_user_id()
     use_case.execute(colli_id, user_id)
     return '', HTTPStatus.NO_CONTENT
@@ -110,7 +238,35 @@ def approve_colli(
     colli_id: UUID,
     use_case: ApproveColliUseCase = Provide[Container.approve_colli_use_case]
 ):
-    """Approuver un COLLI (admin uniquement)."""
+    """
+    Approuver un COLLI
+    ---
+    tags:
+      - COLLI
+    summary: Approuver un COLLI (admin uniquement)
+    security:
+      - BearerAuth: []
+    parameters:
+      - name: colli_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      200:
+        description: COLLI approuvé
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Colli'
+      401:
+        $ref: '#/components/responses/Unauthorized'
+      403:
+        $ref: '#/components/responses/Forbidden'
+      404:
+        $ref: '#/components/responses/NotFound'
+    """
     approver_id = get_current_user_id()
     
     result = use_case.execute(ApproveColliCommand(
@@ -128,7 +284,36 @@ def join_colli(
     colli_id: UUID,
     use_case: JoinColliUseCase = Provide[Container.join_colli_use_case]
 ):
-    """Rejoindre un COLLI en tant que membre."""
+    """
+    Rejoindre un COLLI
+    ---
+    tags:
+      - COLLI
+    summary: Rejoindre un COLLI en tant que membre
+    security:
+      - BearerAuth: []
+    parameters:
+      - name: colli_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      200:
+        description: Membre ajouté
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+      401:
+        $ref: '#/components/responses/Unauthorized'
+      404:
+        $ref: '#/components/responses/NotFound'
+    """
     user_id = get_current_user_id()
     result = use_case.execute(colli_id, user_id)
     return jsonify(result.to_dict()), HTTPStatus.OK
@@ -141,7 +326,29 @@ def leave_colli(
     colli_id: UUID,
     use_case: LeaveColliUseCase = Provide[Container.leave_colli_use_case]
 ):
-    """Quitter un COLLI."""
+    """
+    Quitter un COLLI
+    ---
+    tags:
+      - COLLI
+    summary: Quitter un COLLI
+    security:
+      - BearerAuth: []
+    parameters:
+      - name: colli_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      204:
+        description: Membre retiré
+      401:
+        $ref: '#/components/responses/Unauthorized'
+      404:
+        $ref: '#/components/responses/NotFound'
+    """
     user_id = get_current_user_id()
     use_case.execute(colli_id, user_id)
     return '', HTTPStatus.NO_CONTENT
@@ -154,7 +361,35 @@ def list_members(
     colli_id: UUID,
     use_case = Provide[Container.list_members_use_case]
 ):
-    """Lister les membres d'un COLLI."""
+    """
+    Membres d'un COLLI
+    ---
+    tags:
+      - COLLI
+    summary: Lister les membres d'un COLLI
+    security:
+      - BearerAuth: []
+    parameters:
+      - name: colli_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      200:
+        description: Liste des membres
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/User'
+      401:
+        $ref: '#/components/responses/Unauthorized'
+      404:
+        $ref: '#/components/responses/NotFound'
+    """
     user_id = get_current_user_id()
     result = use_case.execute(colli_id, user_id)
     return jsonify(result), HTTPStatus.OK

@@ -1,5 +1,5 @@
 # src/infrastructure/web/routes/auth_routes.py
-"""Routes d'authentification avec sécurité renforcée."""
+"""Routes d'authentification avec sécurité renforcée et documentation OpenAPI."""
 
 import os
 from flask import Blueprint, request, jsonify, make_response
@@ -43,17 +43,47 @@ def login(
     use_case: AuthenticateUserUseCase = Provide[Container.authenticate_user_use_case]
 ):
     """
-    Authentification d'un utilisateur.
-    
-    Returns:
-        - 200: Access token + refresh token en cookie HttpOnly
-        - 400: Erreur de validation
-        - 401: Identifiants invalides
-        - 403: Compte verrouillé
+    Authentification utilisateur
+    ---
+    tags:
+      - Authentication
+    summary: Connecter un utilisateur
+    description: >
+      Authentifie un utilisateur avec email et mot de passe.
+      Retourne un access_token dans le body et un refresh_token en cookie HttpOnly.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/LoginRequest'
+    responses:
+      200:
+        description: Connexion réussie
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginResponse'
+        headers:
+          Set-Cookie:
+            description: Cookie HttpOnly contenant le refresh_token
+            schema:
+              type: string
+      400:
+        $ref: '#/components/responses/ValidationError'
+      401:
+        $ref: '#/components/responses/Unauthorized'
+      403:
+        description: Compte verrouillé (trop de tentatives)
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Error'
+      429:
+        $ref: '#/components/responses/RateLimited'
     """
     ip = _get_client_ip()
     
-    # Validation des données d'entrée
     schema = LoginSchema()
     try:
         data = schema.load(request.get_json() or {})
@@ -63,23 +93,19 @@ def login(
     email = data['email']
     lockout = get_lockout_service()
     
-    # Vérifier le verrouillage
     if lockout.is_locked(email):
         log_account_locked(email, ip)
         raise ForbiddenException("Compte temporairement bloqué. Réessayez plus tard.")
     
     try:
-        # Exécuter le use case
         result = use_case.execute(AuthenticateUserCommand(
             email=email,
             password=data['password']
         ))
         
-        # Connexion réussie
         lockout.clear_lockout(email)
         log_login_success(str(result.user.id), ip)
         
-        # Réponse avec cookie HttpOnly pour le refresh token
         response = make_response(jsonify({
             'access_token': result.tokens.access_token,
             'token_type': 'Bearer',
@@ -89,7 +115,6 @@ def login(
         return response, HTTPStatus.OK
         
     except Exception as e:
-        # Échec de connexion
         attempts = lockout.increment_failure(email)
         remaining = lockout.get_remaining_attempts(email)
         log_login_failure(email, ip, str(e))
@@ -107,28 +132,49 @@ def register(
     use_case: RegisterUserUseCase = Provide[Container.register_user_use_case]
 ):
     """
-    Inscription d'un nouvel utilisateur.
-    
-    Returns:
-        - 201: Utilisateur créé
-        - 400: Erreur de validation
-        - 409: Email déjà utilisé
+    Inscription utilisateur
+    ---
+    tags:
+      - Authentication
+    summary: Créer un nouveau compte
+    description: >
+      Inscrit un nouvel utilisateur avec le rôle MEMBER par défaut.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/RegisterRequest'
+    responses:
+      201:
+        description: Utilisateur créé
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+      400:
+        $ref: '#/components/responses/ValidationError'
+      409:
+        description: Email déjà utilisé
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Error'
+      429:
+        $ref: '#/components/responses/RateLimited'
     """
-    # Validation des données d'entrée
     schema = RegisterSchema()
     try:
         data = schema.load(request.get_json() or {})
     except ValidationError as err:
         raise ValidationException("Données invalides", errors=err.messages)
     
-    # Vérifier que les mots de passe correspondent
     if data['password'] != data['password_confirm']:
         raise ValidationException(
             "Les mots de passe ne correspondent pas",
             errors={"password_confirm": ["Les mots de passe ne correspondent pas"]}
         )
     
-    # Exécuter le use case
     result = use_case.execute(RegisterUserCommand(
         email=data['email'],
         password=data['password'],
@@ -144,23 +190,43 @@ def register(
 @jwt_required(refresh=True)
 def refresh_token():
     """
-    Rafraîchit le token d'accès avec rotation du refresh token.
-    
-    Returns:
-        - 200: Nouveau access token + nouveau refresh token en cookie
-        - 401: Token de rafraîchissement invalide ou révoqué
+    Rafraîchir les tokens
+    ---
+    tags:
+      - Authentication
+    summary: Obtenir un nouveau access_token
+    description: >
+      Utilise le refresh_token (depuis le cookie) pour générer un nouveau access_token.
+      Le refresh_token est également renouvelé (rotation).
+    security:
+      - BearerAuth: []
+    responses:
+      200:
+        description: Tokens rafraîchis
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                access_token:
+                  type: string
+                token_type:
+                  type: string
+                  example: Bearer
+      401:
+        $ref: '#/components/responses/Unauthorized'
+      429:
+        $ref: '#/components/responses/RateLimited'
     """
     identity = get_jwt_identity()
     claims = get_jwt()
     old_jti = claims.get("jti")
     
-    # Révoquer l'ancien refresh token
     redis_client = get_redis_client()
     if redis_client:
-        ttl = 2592000  # 30 jours
+        ttl = 2592000
         redis_client.setex(f"revoked:{old_jti}", ttl, "revoked")
     
-    # Créer de nouveaux tokens
     new_access_token = create_access_token(
         identity=identity,
         additional_claims={"role": claims.get("role", "member")}
@@ -170,7 +236,6 @@ def refresh_token():
         additional_claims={"role": claims.get("role", "member")}
     )
     
-    # Réponse avec nouveau refresh token en cookie
     response = make_response(jsonify({
         'access_token': new_access_token,
         'token_type': 'Bearer'
@@ -183,25 +248,40 @@ def refresh_token():
 @jwt_required(refresh=True)
 def logout():
     """
-    Déconnexion et révocation du refresh token.
-    
-    Returns:
-        - 200: Déconnexion réussie
-        - 401: Token invalide
+    Déconnexion
+    ---
+    tags:
+      - Authentication
+    summary: Révoquer les tokens et déconnecter
+    description: >
+      Révoque le refresh_token et supprime les cookies d'authentification.
+    security:
+      - BearerAuth: []
+    responses:
+      200:
+        description: Déconnexion réussie
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  example: Déconnexion réussie
+      401:
+        $ref: '#/components/responses/Unauthorized'
     """
     identity = get_jwt_identity()
     claims = get_jwt()
     jti = claims.get("jti")
     
-    # Révoquer le token
     redis_client = get_redis_client()
     if redis_client:
-        ttl = 2592000  # 30 jours
+        ttl = 2592000
         redis_client.setex(f"revoked:{jti}", ttl, "revoked")
     
     log_logout(identity)
     
-    # Supprimer les cookies
     response = make_response(jsonify({'message': 'Déconnexion réussie'}))
     unset_jwt_cookies(response)
     return response, HTTPStatus.OK
@@ -214,9 +294,22 @@ def get_current_user(
     use_case: GetCurrentUserUseCase = Provide[Container.get_current_user_use_case]
 ):
     """
-    Récupère les informations de l'utilisateur connecté.
-    
-    Nécessite authentification.
+    Profil utilisateur courant
+    ---
+    tags:
+      - Authentication
+    summary: Récupérer les informations de l'utilisateur connecté
+    security:
+      - BearerAuth: []
+    responses:
+      200:
+        description: Profil utilisateur
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+      401:
+        $ref: '#/components/responses/Unauthorized'
     """
     user_id = get_current_user_id()
     result = use_case.execute(user_id)

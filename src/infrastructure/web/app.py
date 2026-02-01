@@ -4,12 +4,165 @@
 import os
 from flask import Flask
 from flask_cors import CORS
+from flasgger import Swagger
 import redis
 
 from src.infrastructure.config.settings import get_settings
 from src.infrastructure.security.jwt_service import init_jwt, jwt
 from src.infrastructure.web.middlewares.error_handler import register_error_handlers
 from src.infrastructure.web.middlewares.rate_limiter import init_rate_limiter
+
+
+# Configuration Swagger/OpenAPI
+SWAGGER_TEMPLATE = {
+    "openapi": "3.0.3",
+    "info": {
+        "title": "ALVS API",
+        "version": "1.0.0",
+        "description": "API de correspondances littéraires internationales - NarAction",
+        "contact": {
+            "name": "Équipe ALVS",
+            "email": "contact@naraction.org"
+        }
+    },
+    "servers": [
+        {"url": "http://localhost:5000", "description": "Développement"},
+        {"url": "https://api.alvs.naraction.org", "description": "Production"}
+    ],
+    "components": {
+        "securitySchemes": {
+            "BearerAuth": {
+                "type": "http",
+                "scheme": "bearer",
+                "bearerFormat": "JWT",
+                "description": "Token JWT obtenu via /auth/login"
+            }
+        },
+        "schemas": {
+            "Error": {
+                "type": "object",
+                "properties": {
+                    "error": {"type": "string"},
+                    "message": {"type": "string"},
+                    "details": {"type": "object"}
+                }
+            },
+            "LoginRequest": {
+                "type": "object",
+                "required": ["email", "password"],
+                "properties": {
+                    "email": {"type": "string", "format": "email", "example": "user@example.com"},
+                    "password": {"type": "string", "format": "password", "example": "password123"}
+                }
+            },
+            "LoginResponse": {
+                "type": "object",
+                "properties": {
+                    "access_token": {"type": "string"},
+                    "token_type": {"type": "string", "example": "Bearer"},
+                    "user": {"$ref": "#/components/schemas/User"}
+                }
+            },
+            "RegisterRequest": {
+                "type": "object",
+                "required": ["email", "password", "password_confirm", "first_name", "last_name"],
+                "properties": {
+                    "email": {"type": "string", "format": "email"},
+                    "password": {"type": "string", "minLength": 8},
+                    "password_confirm": {"type": "string"},
+                    "first_name": {"type": "string"},
+                    "last_name": {"type": "string"}
+                }
+            },
+            "User": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string", "format": "uuid"},
+                    "email": {"type": "string", "format": "email"},
+                    "first_name": {"type": "string"},
+                    "last_name": {"type": "string"},
+                    "role": {"type": "string", "enum": ["member", "teacher", "patron", "admin", "relie"]}
+                }
+            },
+            "Colli": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string", "format": "uuid"},
+                    "name": {"type": "string"},
+                    "theme": {"type": "string"},
+                    "description": {"type": "string"},
+                    "status": {"type": "string", "enum": ["pending", "active", "rejected", "completed"]},
+                    "creator_id": {"type": "string", "format": "uuid"},
+                    "created_at": {"type": "string", "format": "date-time"}
+                }
+            },
+            "Letter": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string", "format": "uuid"},
+                    "colli_id": {"type": "string", "format": "uuid"},
+                    "sender_id": {"type": "string", "format": "uuid"},
+                    "letter_type": {"type": "string", "enum": ["text", "file"]},
+                    "content": {"type": "string"},
+                    "created_at": {"type": "string", "format": "date-time"}
+                }
+            },
+            "Comment": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string", "format": "uuid"},
+                    "letter_id": {"type": "string", "format": "uuid"},
+                    "author_id": {"type": "string", "format": "uuid"},
+                    "content": {"type": "string"},
+                    "created_at": {"type": "string", "format": "date-time"}
+                }
+            }
+        },
+        "responses": {
+            "NotFound": {
+                "description": "Ressource non trouvée",
+                "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}
+            },
+            "Unauthorized": {
+                "description": "Token manquant ou invalide",
+                "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}
+            },
+            "Forbidden": {
+                "description": "Permissions insuffisantes",
+                "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}
+            },
+            "RateLimited": {
+                "description": "Trop de requêtes (429)",
+                "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}
+            },
+            "ValidationError": {
+                "description": "Erreur de validation des données",
+                "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}
+            }
+        }
+    },
+    "tags": [
+        {"name": "Authentication", "description": "Gestion de l'authentification"},
+        {"name": "COLLI", "description": "Gestion des communautés littéraires"},
+        {"name": "Letters", "description": "Gestion des correspondances"},
+        {"name": "Comments", "description": "Gestion des commentaires"},
+        {"name": "Health", "description": "Statut de l'API"}
+    ]
+}
+
+SWAGGER_CONFIG = {
+    "headers": [],
+    "specs": [{
+        "endpoint": "apispec",
+        "route": "/apispec.json",
+        "rule_filter": lambda rule: True,
+        "model_filter": lambda tag: True,
+    }],
+    "static_url_path": "/flasgger_static",
+    "swagger_ui": True,
+    "specs_route": "/docs",
+    "openapi": "3.0.3"  # Force OpenAPI 3.0 only
+}
 
 
 # Redis client pour la blocklist
@@ -65,6 +218,9 @@ def create_app(config_override: dict = None) -> Flask:
     CORS(app, origins=cors_origins, supports_credentials=True)
     init_jwt(app)
     init_rate_limiter(app)
+    
+    # Initialiser Swagger (documentation API)
+    Swagger(app, config=SWAGGER_CONFIG, template=SWAGGER_TEMPLATE)
     
     # Configurer la blocklist JWT (révocation de tokens)
     @jwt.token_in_blocklist_loader

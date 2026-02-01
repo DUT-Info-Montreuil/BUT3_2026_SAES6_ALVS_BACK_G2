@@ -1,5 +1,5 @@
 # src/infrastructure/web/routes/comment_routes.py
-"""Routes pour les Comments avec injection de dépendances."""
+"""Routes pour les Comments avec documentation OpenAPI."""
 
 from flask import Blueprint, request, jsonify
 from http import HTTPStatus
@@ -25,7 +25,46 @@ def create_comment(
     letter_id: UUID,
     use_case: CreateCommentUseCase = Provide[Container.create_comment_use_case]
 ):
-    """Créer un commentaire sur une lettre."""
+    """
+    Créer un commentaire
+    ---
+    tags:
+      - Comments
+    summary: Ajouter un commentaire sur une lettre
+    security:
+      - BearerAuth: []
+    parameters:
+      - name: letter_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [content]
+            properties:
+              content:
+                type: string
+                example: "Très belle analyse !"
+    responses:
+      201:
+        description: Commentaire créé
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Comment'
+      400:
+        $ref: '#/components/responses/ValidationError'
+      401:
+        $ref: '#/components/responses/Unauthorized'
+      404:
+        $ref: '#/components/responses/NotFound'
+    """
     data = request.get_json() or {}
     sender_id = get_current_user_id()
     
@@ -48,7 +87,51 @@ def list_comments(
     letter_id: UUID,
     use_case: GetCommentsForLetterUseCase = Provide[Container.get_comments_use_case]
 ):
-    """Lister les commentaires d'une lettre."""
+    """
+    Lister les commentaires
+    ---
+    tags:
+      - Comments
+    summary: Récupérer les commentaires d'une lettre
+    security:
+      - BearerAuth: []
+    parameters:
+      - name: letter_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: page
+        in: query
+        schema:
+          type: integer
+          default: 1
+      - name: per_page
+        in: query
+        schema:
+          type: integer
+          default: 50
+          maximum: 100
+    responses:
+      200:
+        description: Liste paginée des commentaires
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                items:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Comment'
+                total:
+                  type: integer
+      401:
+        $ref: '#/components/responses/Unauthorized'
+      404:
+        $ref: '#/components/responses/NotFound'
+    """
     user_id = get_current_user_id()
     page = request.args.get('page', 1, type=int)
     per_page = min(request.args.get('per_page', 50, type=int), 100)
@@ -65,7 +148,37 @@ def delete_comment(
     comment_id: UUID,
     use_case: DeleteCommentUseCase = Provide[Container.delete_comment_use_case]
 ):
-    """Supprimer un commentaire."""
+    """
+    Supprimer un commentaire
+    ---
+    tags:
+      - Comments
+    summary: Supprimer un commentaire (auteur uniquement)
+    security:
+      - BearerAuth: []
+    parameters:
+      - name: letter_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: comment_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      204:
+        description: Commentaire supprimé
+      401:
+        $ref: '#/components/responses/Unauthorized'
+      403:
+        $ref: '#/components/responses/Forbidden'
+      404:
+        $ref: '#/components/responses/NotFound'
+    """
     user_id = get_current_user_id()
     use_case.execute(comment_id, user_id)
     return '', HTTPStatus.NO_CONTENT

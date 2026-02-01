@@ -26,8 +26,26 @@ class Settings:
     
     # JWT
     JWT_SECRET_KEY: str = None
-    JWT_ACCESS_TOKEN_EXPIRES: int = 3600  # 1 heure
+    JWT_ACCESS_TOKEN_EXPIRES: int = 900  # 15 min (sécurité renforcée)
     JWT_REFRESH_TOKEN_EXPIRES: int = 2592000  # 30 jours
+    
+    # JWT Cookies (Refresh Token)
+    JWT_TOKEN_LOCATION: list = None  # Configuré dans app.py
+    JWT_COOKIE_SECURE: bool = True
+    JWT_COOKIE_HTTPONLY: bool = True
+    JWT_COOKIE_SAMESITE: str = "Strict"
+    JWT_COOKIE_CSRF_PROTECT: bool = True
+    
+    # CORS
+    CORS_ORIGINS: list = None  # ["https://alvs.naraction.org"]
+    
+    # Rate Limiting
+    RATELIMIT_STORAGE_URL: Optional[str] = None  # Redis URL
+    RATELIMIT_DEFAULT: str = "200 per day"
+    
+    # Account Lockout
+    LOCKOUT_THRESHOLD: int = 5
+    LOCKOUT_DURATION: int = 900  # 15 min
     
     # File Upload
     UPLOAD_FOLDER: str = "static/uploads"
@@ -57,14 +75,19 @@ class Settings:
         if len(secret_key) < 32:
             raise ValueError("SECRET_KEY doit contenir au moins 32 caractères")
         
+        is_production = os.getenv("FLASK_ENV") == "production"
+        
         return cls(
             SECRET_KEY=secret_key,
             DEBUG=os.getenv("FLASK_DEBUG", "0") == "1",
             DATABASE_URL=os.getenv("DATABASE_URL", "sqlite:///./data/alvs.db"),
             REDIS_URL=os.getenv("REDIS_URL"),
             JWT_SECRET_KEY=jwt_secret,
-            JWT_ACCESS_TOKEN_EXPIRES=int(os.getenv("JWT_ACCESS_TOKEN_EXPIRES", "3600")),
+            JWT_ACCESS_TOKEN_EXPIRES=int(os.getenv("JWT_ACCESS_TOKEN_EXPIRES", "900")),
             JWT_REFRESH_TOKEN_EXPIRES=int(os.getenv("JWT_REFRESH_TOKEN_EXPIRES", "2592000")),
+            JWT_COOKIE_SECURE=is_production,
+            CORS_ORIGINS=os.getenv("CORS_ORIGINS", "").split(",") if os.getenv("CORS_ORIGINS") else None,
+            RATELIMIT_STORAGE_URL=os.getenv("REDIS_URL"),
             UPLOAD_FOLDER=os.getenv("UPLOAD_FOLDER", "static/uploads"),
             MAX_CONTENT_LENGTH=int(os.getenv("MAX_CONTENT_LENGTH", str(16 * 1024 * 1024))),
         )

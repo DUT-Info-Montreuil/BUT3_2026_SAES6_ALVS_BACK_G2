@@ -129,9 +129,9 @@ class TestAuthRoutes:
         
         assert response.status_code == 200
         data = response.get_json()
-        assert 'tokens' in data
-        assert 'access_token' in data['tokens']
-        assert 'refresh_token' in data['tokens']
+        assert 'access_token' in data
+        assert data['token_type'] == 'Bearer'
+        # refresh_token est maintenant dans un cookie HttpOnly
     
     def test_login_wrong_password(self, client):
         """POST /api/v1/auth/login - Mauvais mot de passe."""
@@ -193,7 +193,7 @@ class TestAuthRoutes:
             '/api/v1/auth/login',
             json={'email': email, 'password': 'password123'}
         )
-        token = login_res.get_json()['tokens']['access_token']
+        token = login_res.get_json()['access_token']
         
         # Get me
         response = client.get(

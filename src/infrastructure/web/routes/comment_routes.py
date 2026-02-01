@@ -182,3 +182,78 @@ def delete_comment(
     user_id = get_current_user_id()
     use_case.execute(comment_id, user_id)
     return '', HTTPStatus.NO_CONTENT
+
+
+@comment_bp.patch('/<uuid:comment_id>')
+@require_auth
+@inject
+def update_comment(
+    letter_id: UUID,
+    comment_id: UUID,
+    use_case = Provide[Container.update_comment_use_case]
+):
+    """
+    Modifier un commentaire
+    ---
+    tags:
+      - Comments
+    summary: Modifier un commentaire (auteur uniquement)
+    security:
+      - BearerAuth: []
+    parameters:
+      - name: letter_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: comment_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [content]
+            properties:
+              content:
+                type: string
+    responses:
+      200:
+        description: Commentaire modifie
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Comment'
+      400:
+        $ref: '#/components/responses/ValidationError'
+      401:
+        $ref: '#/components/responses/Unauthorized'
+      403:
+        $ref: '#/components/responses/Forbidden'
+      404:
+        $ref: '#/components/responses/NotFound'
+    """
+    from src.application.use_cases.comment.update_comment import UpdateCommentCommand
+    from src.application.exceptions import ValidationException
+    
+    data = request.get_json() or {}
+    content = data.get('content')
+    
+    if not content:
+        raise ValidationException("Le contenu est requis", errors={"content": ["Champ requis"]})
+    
+    user_id = get_current_user_id()
+    
+    result = use_case.execute(UpdateCommentCommand(
+        comment_id=comment_id,
+        user_id=user_id,
+        content=content
+    ))
+    
+    return jsonify(result.to_dict()), HTTPStatus.OK

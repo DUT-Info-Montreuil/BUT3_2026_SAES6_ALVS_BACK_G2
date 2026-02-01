@@ -393,3 +393,196 @@ def list_members(
     user_id = get_current_user_id()
     result = use_case.execute(colli_id, user_id)
     return jsonify(result), HTTPStatus.OK
+
+
+@colli_bp.get('/mine')
+@require_auth
+@inject
+def get_my_collis(
+    use_case = Provide[Container.get_user_collis_use_case]
+):
+    """
+    Mes COLLIs
+    ---
+    tags:
+      - COLLI
+    summary: Recuperer les COLLIs de l'utilisateur connecte
+    security:
+      - BearerAuth: []
+    parameters:
+      - name: role
+        in: query
+        schema:
+          type: string
+          enum: [creator, member, all]
+          default: all
+      - name: page
+        in: query
+        schema:
+          type: integer
+          default: 1
+      - name: per_page
+        in: query
+        schema:
+          type: integer
+          default: 20
+    responses:
+      200:
+        description: Liste des COLLIs de l'utilisateur
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                items:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Colli'
+                total:
+                  type: integer
+      401:
+        $ref: '#/components/responses/Unauthorized'
+    """
+    from src.application.use_cases.colli.get_user_collis import ColliRoleFilter
+    
+    user_id = get_current_user_id()
+    role_str = request.args.get('role', 'all')
+    page = request.args.get('page', 1, type=int)
+    per_page = min(request.args.get('per_page', 20, type=int), 100)
+    
+    try:
+        role_filter = ColliRoleFilter(role_str)
+    except ValueError:
+        role_filter = ColliRoleFilter.ALL
+    
+    result = use_case.execute(user_id, role_filter, page, per_page)
+    return jsonify(result), HTTPStatus.OK
+
+
+@colli_bp.patch('/<uuid:colli_id>')
+@require_auth
+@inject
+def update_colli(
+    colli_id: UUID,
+    use_case = Provide[Container.update_colli_use_case]
+):
+    """
+    Modifier un COLLI
+    ---
+    tags:
+      - COLLI
+    summary: Mettre a jour un COLLI (createur uniquement)
+    security:
+      - BearerAuth: []
+    parameters:
+      - name: colli_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              name:
+                type: string
+              theme:
+                type: string
+              description:
+                type: string
+    responses:
+      200:
+        description: COLLI mis a jour
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Colli'
+      401:
+        $ref: '#/components/responses/Unauthorized'
+      403:
+        $ref: '#/components/responses/Forbidden'
+      404:
+        $ref: '#/components/responses/NotFound'
+    """
+    from src.application.use_cases.colli.update_colli import UpdateColliCommand
+    
+    schema = UpdateColliSchema()
+    try:
+        data = schema.load(request.get_json() or {})
+    except ValidationError as err:
+        raise ValidationException("Donnees invalides", errors=err.messages)
+    
+    user_id = get_current_user_id()
+    
+    result = use_case.execute(UpdateColliCommand(
+        colli_id=colli_id,
+        user_id=user_id,
+        name=data.get('name'),
+        theme=data.get('theme'),
+        description=data.get('description')
+    ))
+    
+    return jsonify(result.to_dict()), HTTPStatus.OK
+
+
+@colli_bp.patch('/<uuid:colli_id>/reject')
+@require_role([UserRole.ADMIN])
+@inject
+def reject_colli(
+    colli_id: UUID,
+    use_case = Provide[Container.reject_colli_use_case]
+):
+    """
+    Rejeter un COLLI
+    ---
+    tags:
+      - COLLI
+    summary: Rejeter un COLLI en attente (admin uniquement)
+    security:
+      - BearerAuth: []
+    parameters:
+      - name: colli_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    requestBody:
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              reason:
+                type: string
+                example: "Ne correspond pas aux criteres"
+    responses:
+      200:
+        description: COLLI rejete
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Colli'
+      401:
+        $ref: '#/components/responses/Unauthorized'
+      403:
+        $ref: '#/components/responses/Forbidden'
+      404:
+        $ref: '#/components/responses/NotFound'
+    """
+    from src.application.use_cases.colli.reject_colli import RejectColliCommand
+    
+    data = request.get_json() or {}
+    admin_id = get_current_user_id()
+    
+    result = use_case.execute(RejectColliCommand(
+        colli_id=colli_id,
+        admin_id=admin_id,
+        reason=data.get('reason')
+    ))
+    
+    return jsonify(result.to_dict()), HTTPStatus.OK

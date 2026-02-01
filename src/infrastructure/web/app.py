@@ -26,8 +26,8 @@ SWAGGER_TEMPLATE = {
         }
     },
     "servers": [
-        {"url": "http://localhost:5000", "description": "Développement"},
-        {"url": "https://api.alvs.naraction.org", "description": "Production"}
+        {"url": "http://localhost:5000", "description": "Développement"}
+        # Production sera ajouté après déploiement
     ],
     "components": {
         "securitySchemes": {
@@ -143,9 +143,16 @@ SWAGGER_TEMPLATE = {
     },
     "tags": [
         {"name": "Authentication", "description": "Gestion de l'authentification"},
-        {"name": "COLLI", "description": "Gestion des communautés littéraires"},
+        {"name": "COLLI", "description": "Gestion des communautes litteraires"},
         {"name": "Letters", "description": "Gestion des correspondances"},
         {"name": "Comments", "description": "Gestion des commentaires"},
+        {"name": "Files", "description": "Gestion des fichiers"},
+        {"name": "Notifications", "description": "Notifications utilisateur"},
+        {"name": "Search", "description": "Recherche globale"},
+        {"name": "Invitations", "description": "Invitations COLLI"},
+        {"name": "Reports", "description": "Signalements de contenu"},
+        {"name": "Export", "description": "Export donnees RGPD"},
+        {"name": "Admin", "description": "Administration (admin uniquement)"},
         {"name": "Health", "description": "Statut de l'API"}
     ]
 }
@@ -251,15 +258,35 @@ def _register_blueprints(app: Flask) -> None:
     from src.infrastructure.web.routes.health_routes import health_bp
     from src.infrastructure.web.routes.letter_routes import letter_bp
     from src.infrastructure.web.routes.comment_routes import comment_bp
+    from src.infrastructure.web.routes.file_routes import file_bp
+    from src.infrastructure.web.routes.admin_routes import admin_bp
+    from src.infrastructure.web.routes.notification_routes import notification_bp
+    from src.infrastructure.web.routes.search_routes import search_bp
+    from src.infrastructure.web.routes.invitation_routes import invitation_bp
+    from src.infrastructure.web.routes.report_routes import report_bp
+    from src.infrastructure.web.routes.export_routes import export_bp
     
     app.register_blueprint(auth_bp)
     app.register_blueprint(colli_bp)
     app.register_blueprint(health_bp)
     app.register_blueprint(letter_bp)
     app.register_blueprint(comment_bp)
+    app.register_blueprint(file_bp)
+    app.register_blueprint(admin_bp)
+    app.register_blueprint(notification_bp)
+    app.register_blueprint(search_bp)
+    app.register_blueprint(invitation_bp)
+    app.register_blueprint(report_bp)
+    app.register_blueprint(export_bp)
 
 
-# Point d'entrée pour le développement
+# Point d'entree pour le developpement
 if __name__ == '__main__':
     app = create_app()
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    
+    # Initialiser SocketIO pour les notifications temps reel
+    from src.infrastructure.websocket import init_socketio
+    socketio = init_socketio(app)
+    
+    # Lancer avec SocketIO (supporte WebSocket)
+    socketio.run(app, host='0.0.0.0', port=5000, debug=True)

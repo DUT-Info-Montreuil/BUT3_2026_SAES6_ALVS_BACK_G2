@@ -315,3 +315,278 @@ def get_current_user(
     result = use_case.execute(user_id)
     
     return jsonify(result.to_dict()), HTTPStatus.OK
+
+
+@auth_bp.patch('/me')
+@require_auth
+@inject
+def update_profile(
+    use_case = Provide[Container.update_profile_use_case]
+):
+    """
+    Modifier le profil
+    ---
+    tags:
+      - Authentication
+    summary: Mettre a jour le profil de l'utilisateur connecte
+    security:
+      - BearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              first_name:
+                type: string
+                example: Jean
+              last_name:
+                type: string
+                example: Dupont
+              avatar_url:
+                type: string
+                format: uri
+    responses:
+      200:
+        description: Profil mis a jour
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+      400:
+        $ref: '#/components/responses/ValidationError'
+      401:
+        $ref: '#/components/responses/Unauthorized'
+    """
+    from src.infrastructure.web.schemas.auth_schema import UpdateProfileSchema
+    from src.application.use_cases.user.update_profile import UpdateProfileCommand
+    
+    schema = UpdateProfileSchema()
+    try:
+        data = schema.load(request.get_json() or {})
+    except ValidationError as err:
+        raise ValidationException("Donnees invalides", errors=err.messages)
+    
+    user_id = get_current_user_id()
+    
+    result = use_case.execute(UpdateProfileCommand(
+        user_id=user_id,
+        first_name=data.get('first_name'),
+        last_name=data.get('last_name'),
+        avatar_url=data.get('avatar_url')
+    ))
+    
+    return jsonify(result.to_dict()), HTTPStatus.OK
+
+
+@auth_bp.post('/change-password')
+@require_auth
+@inject
+def change_password(
+    use_case = Provide[Container.change_password_use_case]
+):
+    """
+    Changer le mot de passe
+    ---
+    tags:
+      - Authentication
+    summary: Modifier le mot de passe de l'utilisateur connecte
+    security:
+      - BearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [current_password, new_password, new_password_confirm]
+            properties:
+              current_password:
+                type: string
+                format: password
+              new_password:
+                type: string
+                format: password
+                minLength: 8
+              new_password_confirm:
+                type: string
+                format: password
+    responses:
+      200:
+        description: Mot de passe modifie
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  example: Mot de passe modifie avec succes
+      400:
+        $ref: '#/components/responses/ValidationError'
+      401:
+        $ref: '#/components/responses/Unauthorized'
+    """
+    from src.infrastructure.web.schemas.auth_schema import ChangePasswordSchema
+    from src.application.use_cases.user.change_password import ChangePasswordCommand
+    
+    schema = ChangePasswordSchema()
+    try:
+        data = schema.load(request.get_json() or {})
+    except ValidationError as err:
+        raise ValidationException("Donnees invalides", errors=err.messages)
+    
+    user_id = get_current_user_id()
+    
+    use_case.execute(ChangePasswordCommand(
+        user_id=user_id,
+        current_password=data['current_password'],
+        new_password=data['new_password'],
+        new_password_confirm=data['new_password_confirm']
+    ))
+    
+    return jsonify({'message': 'Mot de passe modifie avec succes'}), HTTPStatus.OK
+
+
+@auth_bp.post('/forgot-password')
+@limiter.limit("3 per minute;10 per hour")
+@inject
+def forgot_password(
+    user_repo = Provide[Container.user_repository]
+):
+    """
+    Demander une reinitialisation de mot de passe
+    ---
+    tags:
+      - Authentication
+    summary: Envoyer un email de reinitialisation de mot de passe
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [email]
+            properties:
+              email:
+                type: string
+                format: email
+    responses:
+      200:
+        description: Email envoye (si le compte existe)
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                token:
+                  type: string
+                  description: Token pour dev/test uniquement
+      400:
+        $ref: '#/components/responses/ValidationError'
+    """
+    from src.application.use_cases.user.forgot_password import (
+        ForgotPasswordUseCase, ForgotPasswordCommand
+    )
+    from src.infrastructure.services.email_service import get_email_service
+    
+    data = request.get_json() or {}
+    email = data.get('email', '').strip().lower()
+    
+    if not email:
+        raise ValidationException("Email requis", errors={"email": ["Champ requis"]})
+    
+    use_case = ForgotPasswordUseCase(
+        user_repository=user_repo,
+        email_service=get_email_service(),
+        base_url=os.getenv('FRONTEND_URL', 'http://localhost:3000')
+    )
+    
+    result = use_case.execute(ForgotPasswordCommand(email=email))
+    
+    response = {'message': result.message}
+    
+    # En dev: retourner le token pour faciliter les tests
+    if os.getenv('FLASK_ENV') == 'development' and result.token:
+        response['token'] = result.token
+        response['reset_url'] = result.reset_url
+    
+    return jsonify(response), HTTPStatus.OK
+
+
+@auth_bp.post('/reset-password')
+@limiter.limit("5 per minute")
+@inject
+def reset_password(
+    user_repo = Provide[Container.user_repository]
+):
+    """
+    Reinitialiser le mot de passe avec un token
+    ---
+    tags:
+      - Authentication
+    summary: Definir un nouveau mot de passe avec le token recu par email
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [token, new_password, confirm_password]
+            properties:
+              token:
+                type: string
+                description: Token recu par email
+              new_password:
+                type: string
+                format: password
+                minLength: 8
+              confirm_password:
+                type: string
+                format: password
+    responses:
+      200:
+        description: Mot de passe reinitialise
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+      400:
+        $ref: '#/components/responses/ValidationError'
+    """
+    from src.application.use_cases.user.reset_password import (
+        ResetPasswordUseCase, ResetPasswordCommand
+    )
+    
+    data = request.get_json() or {}
+    
+    token = data.get('token', '')
+    new_password = data.get('new_password', '')
+    confirm_password = data.get('confirm_password', '')
+    
+    errors = {}
+    if not token:
+        errors['token'] = ["Token requis"]
+    if not new_password:
+        errors['new_password'] = ["Nouveau mot de passe requis"]
+    if not confirm_password:
+        errors['confirm_password'] = ["Confirmation requise"]
+    
+    if errors:
+        raise ValidationException("Donnees invalides", errors=errors)
+    
+    use_case = ResetPasswordUseCase(user_repository=user_repo)
+    
+    result = use_case.execute(ResetPasswordCommand(
+        token=token,
+        new_password=new_password,
+        confirm_password=confirm_password
+    ))
+    
+    return jsonify({'message': result.message}), HTTPStatus.OK

@@ -63,13 +63,13 @@ class Settings:
             if os.getenv("FLASK_ENV") == "production":
                 raise ValueError("SECRET_KEY est obligatoire en production")
             secret_key = secrets.token_urlsafe(32)
-            print("⚠️  SECRET_KEY générée automatiquement (dev uniquement)")
+            print("\u26A0\uFE0F  SECRET_KEY generee automatiquement (dev uniquement)")
         
         if not jwt_secret:
             if os.getenv("FLASK_ENV") == "production":
                 raise ValueError("JWT_SECRET_KEY est obligatoire en production")
             jwt_secret = secrets.token_urlsafe(32)
-            print("⚠️  JWT_SECRET_KEY générée automatiquement (dev uniquement)")
+            print("\u26A0\uFE0F  JWT_SECRET_KEY generee automatiquement (dev uniquement)")
         
         # Validation de la force des clés
         if len(secret_key) < 32:

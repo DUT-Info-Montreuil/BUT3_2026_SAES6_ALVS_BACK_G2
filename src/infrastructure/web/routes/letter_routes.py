@@ -256,3 +256,72 @@ def delete_letter(
     user_id = get_current_user_id()
     use_case.execute(letter_id, user_id)
     return '', HTTPStatus.NO_CONTENT
+
+
+@letter_bp.patch('/<uuid:letter_id>')
+@require_auth
+@inject
+def update_letter(
+    colli_id: UUID,
+    letter_id: UUID,
+    use_case = Provide[Container.update_letter_use_case]
+):
+    """
+    Modifier une lettre
+    ---
+    tags:
+      - Letters
+    summary: Modifier une lettre (auteur uniquement)
+    security:
+      - BearerAuth: []
+    parameters:
+      - name: colli_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: letter_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              content:
+                type: string
+              description:
+                type: string
+    responses:
+      200:
+        description: Lettre modifiee
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Letter'
+      401:
+        $ref: '#/components/responses/Unauthorized'
+      403:
+        $ref: '#/components/responses/Forbidden'
+      404:
+        $ref: '#/components/responses/NotFound'
+    """
+    from src.application.use_cases.letter.update_letter import UpdateLetterCommand
+    
+    data = request.get_json() or {}
+    user_id = get_current_user_id()
+    
+    result = use_case.execute(UpdateLetterCommand(
+        letter_id=letter_id,
+        user_id=user_id,
+        content=data.get('content'),
+        description=data.get('description')
+    ))
+    
+    return jsonify(result.to_dict()), HTTPStatus.OK

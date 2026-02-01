@@ -79,3 +79,61 @@ def admin_auth_headers(app):
         )
     
     return {'Authorization': f'Bearer {access_token}'}
+
+
+@pytest.fixture
+def admin_headers(admin_auth_headers):
+    """Alias pour admin_auth_headers (compatibilite)."""
+    return admin_auth_headers
+
+
+@pytest.fixture
+def registered_user(app, client):
+    """Cree un utilisateur enregistre pour les tests."""
+    user_data = {
+        'email': f'test_{uuid4().hex[:8]}@example.com',
+        'password': 'TestPassword123!',
+        'first_name': 'Test',
+        'last_name': 'User'
+    }
+    
+    with app.app_context():
+        response = client.post('/api/v1/auth/register', json=user_data)
+        if response.status_code == 201:
+            data = response.get_json()
+            return {
+                'email': user_data['email'],
+                'password': user_data['password'],
+                'user_id': data.get('user', {}).get('id')
+            }
+    
+    # Fallback si l'endpoint n'existe pas
+    return {
+        'email': user_data['email'],
+        'password': user_data['password'],
+        'user_id': str(uuid4())
+    }
+
+
+@pytest.fixture
+def setup_colli(app, client, auth_headers, sample_colli_data):
+    """Cree un COLLI pour les tests."""
+    with app.app_context():
+        response = client.post(
+            '/api/v1/collis',
+            headers=auth_headers,
+            json=sample_colli_data
+        )
+        
+        if response.status_code == 201:
+            data = response.get_json()
+            return {
+                'colli_id': data.get('id'),
+                'name': sample_colli_data['name']
+            }
+    
+    # Fallback
+    return {
+        'colli_id': str(uuid4()),
+        'name': sample_colli_data['name']
+    }

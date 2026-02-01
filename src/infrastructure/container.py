@@ -78,6 +78,10 @@ class Container(containers.DeclarativeContainer):
         "src.infrastructure.persistence.in_memory.comment_repository.InMemoryCommentRepository"
     )
     
+    notification_repository = providers.Singleton(
+        "src.infrastructure.persistence.in_memory.notification_repository.InMemoryNotificationRepository"
+    )
+    
     # Repository SQLAlchemy (pour production)
     # colli_repository = providers.Singleton(
     #     SQLAlchemyColliRepository,
@@ -145,6 +149,21 @@ class Container(containers.DeclarativeContainer):
         colli_repository=colli_repository
     )
     
+    update_colli_use_case = providers.Factory(
+        "src.application.use_cases.colli.update_colli.UpdateColliUseCase",
+        colli_repository=colli_repository
+    )
+    
+    reject_colli_use_case = providers.Factory(
+        "src.application.use_cases.colli.reject_colli.RejectColliUseCase",
+        colli_repository=colli_repository
+    )
+    
+    get_user_collis_use_case = providers.Factory(
+        "src.application.use_cases.colli.get_user_collis.GetUserCollisUseCase",
+        colli_repository=colli_repository
+    )
+    
     # User Use Cases
     register_user_use_case = providers.Factory(
         "src.application.use_cases.user.register_user.RegisterUserUseCase",
@@ -159,6 +178,16 @@ class Container(containers.DeclarativeContainer):
     
     get_current_user_use_case = providers.Factory(
         "src.application.use_cases.user.get_current_user.GetCurrentUserUseCase",
+        user_repository=user_repository
+    )
+    
+    update_profile_use_case = providers.Factory(
+        "src.application.use_cases.user.update_profile.UpdateUserProfileUseCase",
+        user_repository=user_repository
+    )
+    
+    change_password_use_case = providers.Factory(
+        "src.application.use_cases.user.change_password.ChangePasswordUseCase",
         user_repository=user_repository
     )
     
@@ -195,6 +224,11 @@ class Container(containers.DeclarativeContainer):
         colli_repository=colli_repository
     )
     
+    update_letter_use_case = providers.Factory(
+        "src.application.use_cases.letter.update_letter.UpdateLetterUseCase",
+        letter_repository=letter_repository
+    )
+    
     # Comment Use Cases
     create_comment_use_case = providers.Factory(
         "src.application.use_cases.comment.create_comment.CreateCommentUseCase",
@@ -215,6 +249,11 @@ class Container(containers.DeclarativeContainer):
         comment_repository=comment_repository,
         letter_repository=letter_repository,
         colli_repository=colli_repository
+    )
+    
+    update_comment_use_case = providers.Factory(
+        "src.application.use_cases.comment.update_comment.UpdateCommentUseCase",
+        comment_repository=comment_repository
     )
 
 
@@ -244,6 +283,10 @@ def init_container(app=None) -> Container:
         "src.infrastructure.web.routes.auth_routes",
         "src.infrastructure.web.routes.letter_routes",
         "src.infrastructure.web.routes.comment_routes",
+        "src.infrastructure.web.routes.admin_routes",
+        "src.infrastructure.web.routes.notification_routes",
+        "src.infrastructure.web.routes.search_routes",
+        "src.infrastructure.web.routes.export_routes",
     ])
     
     return container

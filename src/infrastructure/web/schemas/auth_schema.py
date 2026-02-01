@@ -50,3 +50,10 @@ class ChangePasswordSchema(Schema):
         validate=validate.Length(min=8, error="Le nouveau mot de passe doit contenir au moins 8 caractères")
     )
     new_password_confirm = fields.String(required=True)
+
+
+class UpdateProfileSchema(Schema):
+    """Schema pour la mise a jour du profil."""
+    first_name = fields.String(validate=validate.Length(min=1, max=100))
+    last_name = fields.String(validate=validate.Length(min=1, max=100))
+    avatar_url = fields.Url(allow_none=True)

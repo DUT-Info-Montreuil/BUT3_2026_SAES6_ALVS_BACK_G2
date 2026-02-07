@@ -1,5 +1,8 @@
 import os
+import logging
 from flask_sqlalchemy import SQLAlchemy
+
+logger = logging.getLogger(__name__)
 
 db = SQLAlchemy()
 
@@ -19,4 +22,4 @@ def init_database(app):
         from models.comment_model import Comment
          
         db.create_all()
-        print(f"<Dev>Base de données et tables initialisées: {app.config['SQLALCHEMY_DATABASE_URI']}")
+        logger.info(f"Base de données et tables initialisées: {app.config['SQLALCHEMY_DATABASE_URI']}")

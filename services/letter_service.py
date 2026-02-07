@@ -1,8 +1,11 @@
+import logging
 from models.letter_model import Letter
 from repositories.letter_repository import LetterRepository
 from dtos.letter_dto import LetterDTO
 from shared.socketio import socketio
 from services.file_service import FileService
+
+logger = logging.getLogger(__name__)
 
 
 class LetterService:
@@ -51,7 +54,7 @@ class LetterService:
             try:
                 self.file_service.delete_file(letter.file_url)
             except Exception as e:
-                print(f'Warning: Could not delete physical file {letter.file_url}: {e}')
+                logger.warning(f'Could not delete physical file {letter.file_url}: {e}')
         
         self.letter_repository.delete(letter)
         return True

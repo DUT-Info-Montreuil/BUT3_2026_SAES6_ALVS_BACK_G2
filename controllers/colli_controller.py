@@ -18,12 +18,44 @@ file_service = FileService()
 
 @colli_bp.get('')
 def get_all_collis():
+    """Liste tous les COLLIs
+    ---
+    tags:
+      - Collis
+    responses:
+      200:
+        description: Liste des COLLIs
+    """
     collis = colli_service.get_all_collis()
     return jsonify(collis), HTTPStatus.OK
 
 
 @colli_bp.post('')
 def create_colli():
+    """Créer un nouveau COLLI
+    ---
+    tags:
+      - Collis
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required:
+            - name
+            - theme
+          properties:
+            name:
+              type: string
+            theme:
+              type: string
+            description:
+              type: string
+    responses:
+      201:
+        description: COLLI créé
+    """
     data = request.get_json()
     new_colli = colli_service.create_colli(data)
     return jsonify(new_colli), HTTPStatus.CREATED
@@ -31,6 +63,21 @@ def create_colli():
 
 @colli_bp.get('/<string:colli_id>')
 def get_colli_by_id(colli_id):
+    """Récupérer un COLLI par ID
+    ---
+    tags:
+      - Collis
+    parameters:
+      - name: colli_id
+        in: path
+        type: string
+        required: true
+    responses:
+      200:
+        description: COLLI trouvé
+      404:
+        description: COLLI non trouvé
+    """
     colli = colli_service.get_colli_by_id(colli_id)
     if not colli:
         return jsonify({'error': 'Colli not found'}), HTTPStatus.NOT_FOUND
@@ -50,6 +97,21 @@ def update_colli(colli_id):
 
 @colli_bp.delete('/<string:colli_id>')
 def delete_colli(colli_id):
+    """Supprimer un COLLI
+    ---
+    tags:
+      - Collis
+    parameters:
+      - name: colli_id
+        in: path
+        type: string
+        required: true
+    responses:
+      204:
+        description: Supprimé avec succès
+      404:
+        description: COLLI non trouvé
+    """
     success = colli_service.delete_colli_by_id(colli_id)
     
     if not success:

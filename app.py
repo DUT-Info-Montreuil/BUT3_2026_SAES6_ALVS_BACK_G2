@@ -1,8 +1,10 @@
 #new api in development
 from flask import Flask
+from flasgger import Swagger
 from config import Config
 from shared.database import init_database
 from shared.socketio import socketio
+from shared.swagger_config import SWAGGER_CONFIG, SWAGGER_TEMPLATE
 from controllers.user_controller import user_bp
 from controllers.colli_controller import colli_bp
 
@@ -13,6 +15,10 @@ def create_app():
     # Load configuration from Config class and initialize database
     app.config.from_object(Config)
     init_database(app)
+    
+    # Initialize Swagger documentation
+    app.config['SWAGGER'] = SWAGGER_CONFIG
+    Swagger(app, template=SWAGGER_TEMPLATE)
     
     # Initialize SocketIO
     socketio.init_app(app)

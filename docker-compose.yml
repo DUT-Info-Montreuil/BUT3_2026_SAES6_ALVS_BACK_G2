@@ -1,0 +1,76 @@
+# docker-compose.yml - Configuration de base
+version: '3.9'
+
+services:
+  # ================================
+  # API Flask
+  # ================================
+  api:
+    build:
+      context: .
+      dockerfile: docker/api/Dockerfile
+    container_name: alvs-api
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - FLASK_ENV=${FLASK_ENV:-development}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - ./static/uploads:/app/static/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - alvs-network
+
+  # ================================
+  # PostgreSQL Database
+  # ================================
+  db:
+    image: postgres:16-alpine
+    container_name: alvs-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-alvs_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-alvs_secret_password}
+      POSTGRES_DB: ${POSTGRES_DB:-alvs_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/init-scripts:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-alvs_user} -d ${POSTGRES_DB:-alvs_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - alvs-network
+
+  # ================================
+  # Redis (Cache + Queues)
+  # ================================
+  redis:
+    image: redis:7-alpine
+    container_name: alvs-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - alvs-network
+
+networks:
+  alvs-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:

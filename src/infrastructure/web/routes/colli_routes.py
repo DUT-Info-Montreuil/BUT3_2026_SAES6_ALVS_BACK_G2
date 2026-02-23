@@ -6,6 +6,7 @@ from http import HTTPStatus
 from uuid import UUID
 from marshmallow import ValidationError
 from dependency_injector.wiring import inject, Provide
+from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from src.infrastructure.web.schemas.colli_schema import (
     CreateColliSchema,

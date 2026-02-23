@@ -5,6 +5,7 @@ from flask import Blueprint, request, jsonify
 from http import HTTPStatus
 from uuid import UUID
 from dependency_injector.wiring import inject, Provide
+from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from src.infrastructure.web.middlewares.auth_middleware import require_auth, get_current_user_id
 from src.application.exceptions import ValidationException

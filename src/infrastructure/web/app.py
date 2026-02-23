@@ -220,9 +220,12 @@ def create_app(config_override: dict = None) -> Flask:
     if config_override:
         app.config.update(config_override)
     
+    # Configuration CORS avec origines restreintes
+    cors_origin = os.getenv('CORS_ORIGIN', 'http://localhost:5173')
+    cors_origins = [origin.strip() for origin in cors_origin.split(',')]
+    
     # Initialiser les extensions
-    cors_origins = settings.CORS_ORIGINS or ["*"]
-    CORS(app, origins=cors_origins, supports_credentials=True)
+    CORS(app, origins=cors_origins)
     init_jwt(app)
     init_rate_limiter(app)
     

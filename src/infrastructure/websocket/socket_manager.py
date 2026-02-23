@@ -1,6 +1,7 @@
 # src/infrastructure/websocket/socket_manager.py
 """Gestionnaire de WebSocket avec Flask-SocketIO."""
 
+import os
 from flask_socketio import SocketIO, emit, join_room, leave_room, disconnect
 from flask_jwt_extended import decode_token
 from flask import request
@@ -29,9 +30,13 @@ def init_socketio(app) -> SocketIO:
     """
     global socketio
     
+    # Configuration CORS avec origines restreintes
+    cors_origin = os.getenv('CORS_ORIGIN', 'http://localhost:5173')
+    cors_origins = [origin.strip() for origin in cors_origin.split(',')]
+    
     socketio = SocketIO(
         app,
-        cors_allowed_origins="*",
+        cors_allowed_origins=cors_origins,
         async_mode='threading',  # Pour Windows, sinon 'eventlet'
         logger=True,
         engineio_logger=True

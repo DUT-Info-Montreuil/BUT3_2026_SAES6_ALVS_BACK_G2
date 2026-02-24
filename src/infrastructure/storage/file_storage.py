@@ -74,6 +74,45 @@ class FileStorageService:
         """Calcule le checksum MD5 du fichier."""
         return hashlib.md5(data).hexdigest()
     
+    # Signatures magiques (magic bytes) pour validation du contenu
+    _MAGIC_SIGNATURES = {
+        'png': [b'\x89PNG\r\n\x1a\n'],
+        'jpg': [b'\xff\xd8\xff'],
+        'jpeg': [b'\xff\xd8\xff'],
+        'gif': [b'GIF87a', b'GIF89a'],
+        'pdf': [b'%PDF'],
+        'mp3': [b'\xff\xfb', b'\xff\xf3', b'\xff\xf2', b'ID3'],
+        'wav': [b'RIFF'],
+        'm4a': [b'\x00\x00\x00', b'ftyp'],
+        'doc': [b'\xd0\xcf\x11\xe0'],
+        'docx': [b'PK\x03\x04'],
+    }
+
+    def _validate_mime_content(self, file_data: bytes, extension: str) -> None:
+        """Valide que le contenu du fichier correspond a l'extension declaree."""
+        if extension == 'txt':
+            # Les fichiers texte n'ont pas de signature magique
+            try:
+                file_data[:1024].decode('utf-8')
+            except UnicodeDecodeError:
+                raise ValueError(
+                    f"Le contenu du fichier ne correspond pas a un fichier texte"
+                )
+            return
+
+        signatures = self._MAGIC_SIGNATURES.get(extension)
+        if not signatures:
+            return  # Pas de signature connue, on accepte
+
+        for sig in signatures:
+            if file_data[:len(sig)] == sig:
+                return  # Signature valide
+
+        raise ValueError(
+            f"Le contenu du fichier ne correspond pas au type {extension}. "
+            f"Le fichier pourrait etre corrompu ou avoir une extension incorrecte."
+        )
+
     def _get_mime_type(self, extension: str) -> str:
         """Determine le type MIME selon l'extension."""
         mime_types = {
@@ -117,7 +156,11 @@ class FileStorageService:
         
         if len(file_data) == 0:
             raise ValueError("Fichier vide")
-        
+
+        # Validation du contenu (magic bytes)
+        extension = self._get_extension(original_filename)
+        self._validate_mime_content(file_data, extension)
+
         # Generer ID et chemin
         file_id = self._generate_file_id()
         extension = self._get_extension(original_filename)

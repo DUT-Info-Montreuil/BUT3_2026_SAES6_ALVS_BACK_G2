@@ -18,7 +18,23 @@ from src.domain.shared.domain_exception import DomainException
 
 def register_error_handlers(app: Flask) -> None:
     """Enregistre les handlers d'erreurs globaux."""
-    
+
+    @app.errorhandler(429)
+    def handle_rate_limit(error):
+        return jsonify({
+            'error': 'Too Many Requests',
+            'message': 'Trop de requêtes. Réessayez plus tard.',
+            'status': 429
+        }), 429
+
+    @app.errorhandler(404)
+    def handle_404(error):
+        return jsonify({
+            'error': 'Not Found',
+            'message': 'La ressource demandée est introuvable',
+            'status': 404
+        }), 404
+
     @app.errorhandler(NotFoundException)
     def handle_not_found(error: NotFoundException):
         return jsonify({

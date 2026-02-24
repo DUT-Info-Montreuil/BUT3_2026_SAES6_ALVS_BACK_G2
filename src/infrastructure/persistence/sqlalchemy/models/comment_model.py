@@ -1,8 +1,7 @@
 # src/infrastructure/persistence/sqlalchemy/models/comment_model.py
 """Modèle SQLAlchemy pour les Comments."""
 
-from sqlalchemy import Column, Text, DateTime, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Column, Text, DateTime, ForeignKey, Uuid
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import uuid
@@ -16,10 +15,10 @@ class CommentModel(Base):
     """
     __tablename__ = 'comments'
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(Uuid, primary_key=True, default=uuid.uuid4)
     content = Column(Text, nullable=False)
-    letter_id = Column(UUID(as_uuid=True), ForeignKey('letters.id'), nullable=False, index=True)
-    sender_id = Column(UUID(as_uuid=True), ForeignKey('users.id'), nullable=False, index=True)
+    letter_id = Column(Uuid, ForeignKey('letters.id'), nullable=False, index=True)
+    sender_id = Column(Uuid, ForeignKey('users.id'), nullable=False, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     

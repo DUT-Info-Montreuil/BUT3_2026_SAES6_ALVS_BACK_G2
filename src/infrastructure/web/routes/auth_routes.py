@@ -126,10 +126,11 @@ def login(
 
 
 @auth_bp.post('/register')
-@limiter.limit("3 per hour")
+@limiter.limit("20 per hour")
 @inject
 def register(
-    use_case: RegisterUserUseCase = Provide[Container.register_user_use_case]
+    use_case: RegisterUserUseCase = Provide[Container.register_user_use_case],
+    auth_use_case: AuthenticateUserUseCase = Provide[Container.authenticate_user_use_case]
 ):
     """
     Inscription utilisateur
@@ -181,8 +182,20 @@ def register(
         first_name=data['first_name'],
         last_name=data['last_name']
     ))
-    
-    return jsonify(result.to_dict()), HTTPStatus.CREATED
+
+    # Auto-login : générer les tokens JWT
+    auth_result = auth_use_case.execute(AuthenticateUserCommand(
+        email=data['email'],
+        password=data['password']
+    ))
+
+    response = make_response(jsonify({
+        'access_token': auth_result.tokens.access_token,
+        'token_type': 'Bearer',
+        'user': result.to_dict()
+    }))
+    set_refresh_cookies(response, auth_result.tokens.refresh_token)
+    return response, HTTPStatus.CREATED
 
 
 @auth_bp.post('/refresh')

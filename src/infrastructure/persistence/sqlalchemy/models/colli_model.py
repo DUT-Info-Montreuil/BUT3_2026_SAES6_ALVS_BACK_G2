@@ -1,8 +1,7 @@
 # src/infrastructure/persistence/sqlalchemy/models/colli_model.py
 """Modèle SQLAlchemy pour les COLLIs et Memberships."""
 
-from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Enum as SQLEnum
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Enum as SQLEnum, Uuid
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import uuid
@@ -16,11 +15,11 @@ class ColliModel(Base):
     """
     __tablename__ = 'collis'
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(Uuid, primary_key=True, default=uuid.uuid4)
     name = Column(String(100), nullable=False)
     theme = Column(String(100), nullable=False)
     description = Column(Text, nullable=True)
-    creator_id = Column(UUID(as_uuid=True), ForeignKey('users.id'), nullable=False)
+    creator_id = Column(Uuid, ForeignKey('users.id'), nullable=False)
     status = Column(String(20), nullable=False, default='pending', index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -39,10 +38,11 @@ class MembershipModel(Base):
     """
     __tablename__ = 'memberships'
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey('users.id'), nullable=False)
-    colli_id = Column(UUID(as_uuid=True), ForeignKey('collis.id'), nullable=False)
+    id = Column(Uuid, primary_key=True, default=uuid.uuid4)
+    user_id = Column(Uuid, ForeignKey('users.id'), nullable=False)
+    colli_id = Column(Uuid, ForeignKey('collis.id'), nullable=False)
     role = Column(String(20), nullable=False, default='member')
+    status = Column(String(20), nullable=False, default='pending')
     joined_at = Column(DateTime(timezone=True), server_default=func.now())
     
     # Relations

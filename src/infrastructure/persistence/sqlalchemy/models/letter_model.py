@@ -1,8 +1,7 @@
 # src/infrastructure/persistence/sqlalchemy/models/letter_model.py
 """Modèle SQLAlchemy pour les Letters."""
 
-from sqlalchemy import Column, String, Text, DateTime, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Uuid
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import uuid
@@ -16,13 +15,13 @@ class LetterModel(Base):
     """
     __tablename__ = 'letters'
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(Uuid, primary_key=True, default=uuid.uuid4)
     letter_type = Column(String(20), nullable=False, default='text')
     content = Column(Text, nullable=True)
     file_url = Column(String(255), nullable=True)
     file_name = Column(String(255), nullable=True)
-    colli_id = Column(UUID(as_uuid=True), ForeignKey('collis.id'), nullable=False, index=True)
-    sender_id = Column(UUID(as_uuid=True), ForeignKey('users.id'), nullable=False, index=True)
+    colli_id = Column(Uuid, ForeignKey('collis.id'), nullable=False, index=True)
+    sender_id = Column(Uuid, ForeignKey('users.id'), nullable=False, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     

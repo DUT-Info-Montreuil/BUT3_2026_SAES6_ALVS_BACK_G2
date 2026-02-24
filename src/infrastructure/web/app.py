@@ -186,6 +186,34 @@ def get_redis_client():
     return _redis_client
 
 
+def _seed_default_admin(container):
+    """Crée un compte admin par défaut si aucun admin n'existe en base."""
+    try:
+        from src.domain.identity.entities.user import User
+        from src.domain.identity.value_objects.user_role import UserRole
+
+        session = container.db_session()
+        from src.infrastructure.persistence.sqlalchemy.models.user_model import UserModel
+        admin_exists = session.query(UserModel).filter_by(role='admin').first()
+
+        if not admin_exists:
+            admin = User.create(
+                email='admin@alvs.fr',
+                password='Admin1234',
+                first_name='Admin',
+                last_name='ALVS',
+                role=UserRole.ADMIN
+            )
+            repo = container.user_repository()
+            repo.save(admin)
+            session.commit()
+            print(">>> Compte admin cree : admin@alvs.fr / Admin1234")
+        else:
+            session.rollback()
+    except Exception as e:
+        print(f">>> Seed admin skip: {e}")
+
+
 def create_app(config_override: dict = None) -> Flask:
     """
     Factory pour créer l'application Flask.
@@ -242,9 +270,29 @@ def create_app(config_override: dict = None) -> Flask:
         return False
     
     # Initialiser le container d'injection de dépendances
-    from src.infrastructure.container import init_container
+    from src.infrastructure.container import init_container, container
     init_container(app)
-    
+
+    # Créer les tables SQLAlchemy
+    from src.infrastructure.persistence.sqlalchemy.database import init_db
+    init_db(container.engine())
+
+    # Seeder un admin par défaut s'il n'en existe aucun
+    _seed_default_admin(container)
+
+    # Nettoyage de session après chaque requête
+    @app.teardown_appcontext
+    def cleanup_session(exception=None):
+        session = container.db_session()
+        if exception:
+            session.rollback()
+        else:
+            try:
+                session.commit()
+            except Exception:
+                session.rollback()
+        session.remove()
+
     # Enregistrer les middlewares
     register_error_handlers(app)
     

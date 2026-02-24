@@ -7,6 +7,7 @@ from src.domain.collaboration.entities.colli import Colli
 from src.domain.collaboration.entities.membership import Membership
 from src.domain.collaboration.value_objects.colli_status import ColliStatus
 from src.domain.collaboration.value_objects.member_role import MemberRole
+from src.domain.collaboration.value_objects.membership_status import MembershipStatus
 from src.infrastructure.persistence.sqlalchemy.models.colli_model import ColliModel, MembershipModel
 
 
@@ -21,6 +22,7 @@ class MembershipMapper:
             user_id=model.user_id,
             colli_id=model.colli_id,
             role=MemberRole(model.role),
+            status=MembershipStatus(model.status),
             joined_at=model.joined_at
         )
     
@@ -32,6 +34,7 @@ class MembershipMapper:
             user_id=entity.user_id,
             colli_id=entity.colli_id,
             role=entity.role.value,
+            status=entity.status.value,
             joined_at=entity.joined_at
         )
 

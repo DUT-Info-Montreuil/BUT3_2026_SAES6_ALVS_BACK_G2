@@ -86,7 +86,7 @@ def init_db(engine=None):
         engine = create_engine_from_config()
     
     # Import des modèles pour que SQLAlchemy les détecte
-    from src.infrastructure.persistence.sqlalchemy.models import colli_model, user_model
+    from src.infrastructure.persistence.sqlalchemy.models import colli_model, user_model, letter_model, comment_model
     
     Base.metadata.create_all(bind=engine)
     return engine

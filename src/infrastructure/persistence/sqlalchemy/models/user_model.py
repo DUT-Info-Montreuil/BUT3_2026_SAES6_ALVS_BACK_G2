@@ -1,8 +1,7 @@
 # src/infrastructure/persistence/sqlalchemy/models/user_model.py
 """Modèle SQLAlchemy pour les utilisateurs."""
 
-from sqlalchemy import Column, String, Boolean, DateTime, Enum
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Column, String, Boolean, DateTime, Enum, Uuid
 from sqlalchemy.sql import func
 import uuid
 
@@ -18,7 +17,7 @@ class UserModel(Base):
     """
     __tablename__ = 'users'
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(Uuid, primary_key=True, default=uuid.uuid4)
     email = Column(String(255), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
     first_name = Column(String(100), nullable=False)

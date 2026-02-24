@@ -11,8 +11,16 @@ from dependency_injector import containers, providers
 # Configuration
 from src.infrastructure.config.settings import Settings, get_settings
 
-# Repositories (interfaces)
-from src.domain.collaboration.repositories.colli_repository import IColliRepository
+# Database
+from src.infrastructure.persistence.sqlalchemy.database import (
+    create_engine_from_config, create_session_factory, get_scoped_session
+)
+
+# Repositories SQLAlchemy
+from src.infrastructure.persistence.sqlalchemy.repositories.user_repository import SQLAlchemyUserRepository
+from src.infrastructure.persistence.sqlalchemy.repositories.colli_repository import SQLAlchemyColliRepository
+from src.infrastructure.persistence.sqlalchemy.repositories.letter_repository import SQLAlchemyLetterRepository
+from src.infrastructure.persistence.sqlalchemy.repositories.comment_repository import SQLAlchemyCommentRepository
 
 # Use Cases
 from src.application.use_cases.colli.create_colli import CreateColliUseCase
@@ -44,49 +52,24 @@ class Container(containers.DeclarativeContainer):
     # =========================================================================
     # GATEWAYS (connexions externes)
     # =========================================================================
-    
-    # Database session factory
-    # db_session_factory = providers.Singleton(
-    #     create_session_factory,
-    #     database_url=config.provided.DATABASE_URL
-    # )
-    
-    # Redis client (optionnel)
-    # redis_client = providers.Singleton(
-    #     create_redis_client,
-    #     redis_url=config.provided.REDIS_URL
-    # )
-    
+
+    engine = providers.Singleton(create_engine_from_config)
+    session_factory = providers.Singleton(create_session_factory, engine=engine)
+    db_session = providers.Singleton(get_scoped_session, session_factory=session_factory)
+
     # =========================================================================
-    # REPOSITORIES
+    # REPOSITORIES (SQLAlchemy)
     # =========================================================================
-    
-    # Repository In-Memory (pour dev/tests)
-    colli_repository = providers.Singleton(
-        "src.infrastructure.persistence.in_memory.colli_repository.InMemoryColliRepository"
-    )
-    
-    user_repository = providers.Singleton(
-        "src.infrastructure.persistence.in_memory.user_repository.InMemoryUserRepository"
-    )
-    
-    letter_repository = providers.Singleton(
-        "src.infrastructure.persistence.in_memory.letter_repository.InMemoryLetterRepository"
-    )
-    
-    comment_repository = providers.Singleton(
-        "src.infrastructure.persistence.in_memory.comment_repository.InMemoryCommentRepository"
-    )
-    
+
+    user_repository = providers.Factory(SQLAlchemyUserRepository, session=db_session)
+    colli_repository = providers.Factory(SQLAlchemyColliRepository, session=db_session)
+    letter_repository = providers.Factory(SQLAlchemyLetterRepository, session=db_session)
+    comment_repository = providers.Factory(SQLAlchemyCommentRepository, session=db_session)
+
+    # Notification (pas de table SQLAlchemy — reste in-memory)
     notification_repository = providers.Singleton(
         "src.infrastructure.persistence.in_memory.notification_repository.InMemoryNotificationRepository"
     )
-    
-    # Repository SQLAlchemy (pour production)
-    # colli_repository = providers.Singleton(
-    #     SQLAlchemyColliRepository,
-    #     session_factory=db_session_factory
-    # )
     
     # =========================================================================
     # SERVICES

@@ -143,7 +143,17 @@ class Container(containers.DeclarativeContainer):
         "src.application.use_cases.colli.membership.LeaveColliUseCase",
         colli_repository=colli_repository
     )
-    
+
+    accept_member_use_case = providers.Factory(
+        "src.application.use_cases.colli.membership.AcceptMemberUseCase",
+        colli_repository=colli_repository
+    )
+
+    reject_member_use_case = providers.Factory(
+        "src.application.use_cases.colli.membership.RejectMemberUseCase",
+        colli_repository=colli_repository
+    )
+
     list_members_use_case = providers.Factory(
         "src.application.use_cases.colli.list_members.ListMembersUseCase",
         colli_repository=colli_repository

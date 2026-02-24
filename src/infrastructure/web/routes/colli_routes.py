@@ -26,7 +26,9 @@ from src.application.use_cases.colli.create_colli import CreateColliUseCase, Cre
 from src.application.use_cases.colli.approve_colli import ApproveColliUseCase, ApproveColliCommand
 from src.application.use_cases.colli.get_colli import GetColliByIdUseCase, ListCollisUseCase
 from src.application.use_cases.colli.delete_colli import DeleteColliUseCase
-from src.application.use_cases.colli.membership import JoinColliUseCase, LeaveColliUseCase
+from src.application.use_cases.colli.membership import (
+    JoinColliUseCase, LeaveColliUseCase, AcceptMemberUseCase, RejectMemberUseCase
+)
 from src.infrastructure.container import Container
 
 
@@ -34,7 +36,7 @@ colli_bp = Blueprint('collis', __name__, url_prefix='/api/v1/collis')
 
 
 @colli_bp.post('')
-@jwt_required()
+@require_auth
 @inject
 def create_colli(
     use_case: CreateColliUseCase = Provide[Container.create_colli_use_case]
@@ -317,6 +319,94 @@ def join_colli(
     """
     user_id = get_current_user_id()
     result = use_case.execute(colli_id, user_id)
+    return jsonify(result), HTTPStatus.OK
+
+
+@colli_bp.patch('/<uuid:colli_id>/members/<uuid:user_id>/accept')
+@require_auth
+@inject
+def accept_member(
+    colli_id: UUID,
+    user_id: UUID,
+    use_case: AcceptMemberUseCase = Provide[Container.accept_member_use_case]
+):
+    """
+    Accepter une demande d'adhésion
+    ---
+    tags:
+      - COLLI
+    summary: Accepter une demande d'adhésion (manager uniquement)
+    security:
+      - BearerAuth: []
+    parameters:
+      - name: colli_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      200:
+        description: Membre accepté
+      401:
+        $ref: '#/components/responses/Unauthorized'
+      403:
+        $ref: '#/components/responses/Forbidden'
+      404:
+        $ref: '#/components/responses/NotFound'
+    """
+    requester_id = get_current_user_id()
+    result = use_case.execute(colli_id, user_id, requester_id)
+    return jsonify(result.to_dict()), HTTPStatus.OK
+
+
+@colli_bp.patch('/<uuid:colli_id>/members/<uuid:user_id>/reject')
+@require_auth
+@inject
+def reject_member(
+    colli_id: UUID,
+    user_id: UUID,
+    use_case: RejectMemberUseCase = Provide[Container.reject_member_use_case]
+):
+    """
+    Rejeter une demande d'adhésion
+    ---
+    tags:
+      - COLLI
+    summary: Rejeter une demande d'adhésion (manager uniquement)
+    security:
+      - BearerAuth: []
+    parameters:
+      - name: colli_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      200:
+        description: Membre rejeté
+      401:
+        $ref: '#/components/responses/Unauthorized'
+      403:
+        $ref: '#/components/responses/Forbidden'
+      404:
+        $ref: '#/components/responses/NotFound'
+    """
+    requester_id = get_current_user_id()
+    result = use_case.execute(colli_id, user_id, requester_id)
     return jsonify(result.to_dict()), HTTPStatus.OK
 
 

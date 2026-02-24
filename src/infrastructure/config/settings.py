@@ -50,6 +50,9 @@ class Config:
     MAX_CONTENT_LENGTH: int = 16 * 1024 * 1024  # 16 MB
     ALLOWED_EXTENSIONS: frozenset = frozenset({'png', 'jpg', 'jpeg', 'gif', 'mp3', 'wav', 'm4a', 'pdf'})
     
+    # Error Handling
+    EXPOSE_ERROR_DETAILS: bool = False
+    
     def validate(self) -> None:
         """Valide la configuration au démarrage."""
         if not self.SECRET_KEY:
@@ -91,6 +94,7 @@ class DevelopmentConfig(Config):
             RATELIMIT_STORAGE_URL=os.getenv("REDIS_URL"),
             UPLOAD_FOLDER=os.getenv("UPLOAD_FOLDER", "static/uploads"),
             MAX_CONTENT_LENGTH=int(os.getenv("MAX_CONTENT_LENGTH", str(16 * 1024 * 1024))),
+            EXPOSE_ERROR_DETAILS=os.getenv("EXPOSE_ERROR_DETAILS", "true").lower() == "true",
         )
 
 
@@ -121,6 +125,7 @@ class TestConfig(Config):
             RATELIMIT_STORAGE_URL=None,
             UPLOAD_FOLDER="test_uploads",
             MAX_CONTENT_LENGTH=int(os.getenv("MAX_CONTENT_LENGTH", str(16 * 1024 * 1024))),
+            EXPOSE_ERROR_DETAILS=os.getenv("EXPOSE_ERROR_DETAILS", "false").lower() == "true",
         )
 
 
@@ -128,6 +133,7 @@ class ProductionConfig(Config):
     """Configuration pour la production."""
     
     def __init__(self):
+        # Validation des secrets requis AVANT l'initialisation
         self._validate_required_secrets()
         
         secret_key = os.getenv("SECRET_KEY")
@@ -150,6 +156,7 @@ class ProductionConfig(Config):
             RATELIMIT_STORAGE_URL=os.getenv("REDIS_URL"),
             UPLOAD_FOLDER=os.getenv("UPLOAD_FOLDER", "static/uploads"),
             MAX_CONTENT_LENGTH=int(os.getenv("MAX_CONTENT_LENGTH", str(16 * 1024 * 1024))),
+            EXPOSE_ERROR_DETAILS=os.getenv("EXPOSE_ERROR_DETAILS", "false").lower() == "true",
         )
     
     def _validate_required_secrets(self):

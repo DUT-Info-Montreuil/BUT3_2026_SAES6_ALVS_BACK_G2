@@ -191,5 +191,11 @@ def get_settings() -> Config:
     return _settings
 
 
+def reset_settings() -> None:
+    """Réinitialise le singleton de configuration (utile pour les tests)."""
+    global _settings
+    _settings = None
+
+
 # Alias pour compatibilité avec l'ancien code
 Settings = Config

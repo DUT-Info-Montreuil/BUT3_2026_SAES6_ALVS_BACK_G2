@@ -45,13 +45,20 @@ class TestCommentRoutes:
         )
         assert approve_res.status_code == 200, f"Approve failed: {approve_res.get_json()}"
         
-        # Member rejoint
+        # Member rejoint (demande PENDING)
         join_res = client.post(
             f'/api/v1/collis/{colli_id}/join',
             headers={'Authorization': f'Bearer {member_token}'}
         )
         assert join_res.status_code == 200, f"Join failed: {join_res.get_json()}"
-        
+
+        # Teacher (manager) accepte le member
+        accept_res = client.patch(
+            f'/api/v1/collis/{colli_id}/members/{member_id}/accept',
+            headers={'Authorization': f'Bearer {teacher_token}'}
+        )
+        assert accept_res.status_code == 200, f"Accept failed: {accept_res.get_json()}"
+
         # Créer lettre
         create_letter = client.post(
             f'/api/v1/collis/{colli_id}/letters',

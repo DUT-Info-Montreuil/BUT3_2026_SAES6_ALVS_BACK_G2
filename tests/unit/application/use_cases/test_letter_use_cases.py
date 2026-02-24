@@ -10,7 +10,7 @@ from src.application.use_cases.letter.delete_letter import DeleteLetterUseCase
 from src.application.dtos.letter_dto import CreateTextLetterCommand, CreateFileLetterCommand
 from src.application.use_cases.colli.create_colli import CreateColliUseCase, CreateColliCommand
 from src.application.use_cases.colli.approve_colli import ApproveColliUseCase, ApproveColliCommand
-from src.application.use_cases.colli.membership import JoinColliUseCase
+from src.application.use_cases.colli.membership import JoinColliUseCase, AcceptMemberUseCase
 from src.application.exceptions import NotFoundException, ForbiddenException
 from src.infrastructure.persistence.in_memory.letter_repository import InMemoryLetterRepository
 from src.infrastructure.persistence.in_memory.comment_repository import InMemoryCommentRepository
@@ -31,23 +31,25 @@ def to_uuid(id_str):
 
 class TestCreateTextLetterUseCase:
     """Tests pour CreateTextLetterUseCase."""
-    
+
     def _setup_colli(self, colli_repo):
         """Crée un COLLI actif avec un membre."""
         creator_id = uuid4()
         member_id = uuid4()
-        
+
         create_uc = CreateColliUseCase(colli_repo)
         approve_uc = ApproveColliUseCase(colli_repo, MockEventPublisher())
         join_uc = JoinColliUseCase(colli_repo)
-        
+        accept_uc = AcceptMemberUseCase(colli_repo)
+
         colli = create_uc.execute(CreateColliCommand(
             name="Test COLLI", theme="Test", description=None, creator_id=creator_id
         ))
         colli_uuid = to_uuid(colli.id)
         approve_uc.execute(ApproveColliCommand(colli_id=colli_uuid, approver_id=uuid4()))
         join_uc.execute(colli_uuid, member_id)
-        
+        accept_uc.execute(colli_uuid, member_id, creator_id)
+
         return colli, creator_id, member_id
     
     def test_create_text_letter_success(self):
@@ -116,22 +118,24 @@ class TestCreateTextLetterUseCase:
 
 class TestCreateFileLetterUseCase:
     """Tests pour CreateFileLetterUseCase."""
-    
+
     def _setup_colli(self, colli_repo):
         creator_id = uuid4()
         member_id = uuid4()
-        
+
         create_uc = CreateColliUseCase(colli_repo)
         approve_uc = ApproveColliUseCase(colli_repo, MockEventPublisher())
         join_uc = JoinColliUseCase(colli_repo)
-        
+        accept_uc = AcceptMemberUseCase(colli_repo)
+
         colli = create_uc.execute(CreateColliCommand(
             name="Test COLLI", theme="Test", description=None, creator_id=creator_id
         ))
         colli_uuid = to_uuid(colli.id)
         approve_uc.execute(ApproveColliCommand(colli_id=colli_uuid, approver_id=uuid4()))
         join_uc.execute(colli_uuid, member_id)
-        
+        accept_uc.execute(colli_uuid, member_id, creator_id)
+
         return colli, creator_id, member_id
     
     def test_create_file_letter_success(self):
@@ -157,22 +161,24 @@ class TestCreateFileLetterUseCase:
 
 class TestGetLettersForColliUseCase:
     """Tests pour GetLettersForColliUseCase."""
-    
+
     def _setup_colli(self, colli_repo):
         creator_id = uuid4()
         member_id = uuid4()
-        
+
         create_uc = CreateColliUseCase(colli_repo)
         approve_uc = ApproveColliUseCase(colli_repo, MockEventPublisher())
         join_uc = JoinColliUseCase(colli_repo)
-        
+        accept_uc = AcceptMemberUseCase(colli_repo)
+
         colli = create_uc.execute(CreateColliCommand(
             name="Test COLLI", theme="Test", description=None, creator_id=creator_id
         ))
         colli_uuid = to_uuid(colli.id)
         approve_uc.execute(ApproveColliCommand(colli_id=colli_uuid, approver_id=uuid4()))
         join_uc.execute(colli_uuid, member_id)
-        
+        accept_uc.execute(colli_uuid, member_id, creator_id)
+
         return colli, creator_id, member_id
     
     def test_get_letters_empty(self):
@@ -225,22 +231,24 @@ class TestGetLettersForColliUseCase:
 
 class TestGetLetterByIdUseCase:
     """Tests pour GetLetterByIdUseCase."""
-    
+
     def _setup_colli(self, colli_repo):
         creator_id = uuid4()
         member_id = uuid4()
-        
+
         create_uc = CreateColliUseCase(colli_repo)
         approve_uc = ApproveColliUseCase(colli_repo, MockEventPublisher())
         join_uc = JoinColliUseCase(colli_repo)
-        
+        accept_uc = AcceptMemberUseCase(colli_repo)
+
         colli = create_uc.execute(CreateColliCommand(
             name="Test COLLI", theme="Test", description=None, creator_id=creator_id
         ))
         colli_uuid = to_uuid(colli.id)
         approve_uc.execute(ApproveColliCommand(colli_id=colli_uuid, approver_id=uuid4()))
         join_uc.execute(colli_uuid, member_id)
-        
+        accept_uc.execute(colli_uuid, member_id, creator_id)
+
         return colli, creator_id, member_id
     
     def test_get_letter_success(self):
@@ -276,22 +284,24 @@ class TestGetLetterByIdUseCase:
 
 class TestDeleteLetterUseCase:
     """Tests pour DeleteLetterUseCase."""
-    
+
     def _setup_colli(self, colli_repo):
         creator_id = uuid4()
         member_id = uuid4()
-        
+
         create_uc = CreateColliUseCase(colli_repo)
         approve_uc = ApproveColliUseCase(colli_repo, MockEventPublisher())
         join_uc = JoinColliUseCase(colli_repo)
-        
+        accept_uc = AcceptMemberUseCase(colli_repo)
+
         colli = create_uc.execute(CreateColliCommand(
             name="Test COLLI", theme="Test", description=None, creator_id=creator_id
         ))
         colli_uuid = to_uuid(colli.id)
         approve_uc.execute(ApproveColliCommand(colli_id=colli_uuid, approver_id=uuid4()))
         join_uc.execute(colli_uuid, member_id)
-        
+        accept_uc.execute(colli_uuid, member_id, creator_id)
+
         return colli, creator_id, member_id
     
     def test_delete_by_author(self):

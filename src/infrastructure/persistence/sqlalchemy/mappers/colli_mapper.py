@@ -126,18 +126,24 @@ class ColliMapper:
         
         # Synchroniser les membres
         existing_member_ids = {m.id for m in model.members}
+        existing_members_map = {m.id: m for m in model.members}
         entity_member_ids = {m.id for m in entity.members}
-        
+
         # Supprimer les membres retirés
         model.members = [
             m for m in model.members if m.id in entity_member_ids
         ]
-        
-        # Ajouter les nouveaux membres
+
+        # Ajouter les nouveaux membres et mettre à jour les existants
         for member in entity.members:
             if member.id not in existing_member_ids:
                 model.members.append(MembershipMapper.to_model(member))
-        
+            else:
+                # Mettre à jour le statut et le rôle des membres existants
+                existing_model = existing_members_map[member.id]
+                existing_model.status = member.status.value
+                existing_model.role = member.role.value
+
         return model
     
     @staticmethod

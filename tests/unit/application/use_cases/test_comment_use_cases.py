@@ -12,7 +12,7 @@ from src.application.dtos.letter_dto import CreateTextLetterCommand
 from src.application.use_cases.letter.create_letter import CreateTextLetterUseCase
 from src.application.use_cases.colli.create_colli import CreateColliUseCase, CreateColliCommand
 from src.application.use_cases.colli.approve_colli import ApproveColliUseCase, ApproveColliCommand
-from src.application.use_cases.colli.membership import JoinColliUseCase
+from src.application.use_cases.colli.membership import JoinColliUseCase, AcceptMemberUseCase
 from src.application.exceptions import NotFoundException, ForbiddenException
 from src.infrastructure.persistence.in_memory.letter_repository import InMemoryLetterRepository
 from src.infrastructure.persistence.in_memory.comment_repository import InMemoryCommentRepository
@@ -39,21 +39,23 @@ class CommentTestBase:
         colli_repo = InMemoryColliRepository()
         letter_repo = InMemoryLetterRepository()
         comment_repo = InMemoryCommentRepository()
-        
+
         creator_id = uuid4()
         member_id = uuid4()
-        
+
         create_colli = CreateColliUseCase(colli_repo)
         approve_colli = ApproveColliUseCase(colli_repo, MockEventPublisher())
         join_colli = JoinColliUseCase(colli_repo)
-        
+        accept_colli = AcceptMemberUseCase(colli_repo)
+
         colli = create_colli.execute(CreateColliCommand(
             name="Test COLLI", theme="Test", description=None, creator_id=creator_id
         ))
         colli_uuid = to_uuid(colli.id)
         approve_colli.execute(ApproveColliCommand(colli_id=colli_uuid, approver_id=uuid4()))
         join_colli.execute(colli_uuid, member_id)
-        
+        accept_colli.execute(colli_uuid, member_id, creator_id)
+
         create_letter = CreateTextLetterUseCase(letter_repo, colli_repo)
         letter = create_letter.execute(CreateTextLetterCommand(
             colli_id=colli_uuid,

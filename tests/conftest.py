@@ -1,22 +1,53 @@
 # tests/conftest.py
 """Fixtures pytest partagées pour tous les tests."""
 
+import os
 import pytest
 from uuid import uuid4
 
-from src.infrastructure.web.app import create_app
+# Force l'environnement de test AVANT tout import de settings
+os.environ['FLASK_ENV'] = 'testing'
+
+from src.infrastructure.config.settings import reset_settings
+
+
+@pytest.fixture(autouse=True)
+def _reset_state():
+    """Réinitialise l'état global entre chaque test."""
+    reset_settings()
+    yield
+    reset_settings()
 
 
 @pytest.fixture
 def app():
     """Crée une instance de l'application pour les tests."""
+    from src.infrastructure.web.app import create_app
+    from src.infrastructure.container import container
+    from src.infrastructure.persistence.sqlalchemy.database import Base
+
     app = create_app({
         'TESTING': True,
         'SECRET_KEY': 'test-secret-key-minimum-32-characters',
         'JWT_SECRET_KEY': 'test-jwt-secret-key-minimum-32-characters',
     })
-    
+
+    # S'assurer que les tables existent
+    with app.app_context():
+        engine = container.engine()
+        Base.metadata.create_all(bind=engine)
+
     yield app
+
+    # Nettoyage : supprimer toutes les tables après le test
+    with app.app_context():
+        engine = container.engine()
+        Base.metadata.drop_all(bind=engine)
+
+    # Reset container singletons pour le prochain test
+    container.engine.reset()
+    container.session_factory.reset()
+    container.db_session.reset()
 
 
 @pytest.fixture
@@ -51,19 +82,19 @@ def sample_colli_data():
 def auth_headers(app, sample_user_id):
     """
     Génère des headers d'authentification JWT pour les tests.
-    
+
     Usage:
         def test_protected_route(client, auth_headers):
             response = client.get('/api/v1/collis', headers=auth_headers)
     """
     from flask_jwt_extended import create_access_token
-    
+
     with app.app_context():
         access_token = create_access_token(
             identity=str(sample_user_id),
             additional_claims={'role': 'teacher'}
         )
-    
+
     return {'Authorization': f'Bearer {access_token}'}
 
 
@@ -71,13 +102,13 @@ def auth_headers(app, sample_user_id):
 def admin_auth_headers(app):
     """Headers d'authentification pour un admin."""
     from flask_jwt_extended import create_access_token
-    
+
     with app.app_context():
         access_token = create_access_token(
             identity=str(uuid4()),
             additional_claims={'role': 'admin'}
         )
-    
+
     return {'Authorization': f'Bearer {access_token}'}
 
 
@@ -93,10 +124,11 @@ def registered_user(app, client):
     user_data = {
         'email': f'test_{uuid4().hex[:8]}@example.com',
         'password': 'TestPassword123!',
+        'password_confirm': 'TestPassword123!',
         'first_name': 'Test',
         'last_name': 'User'
     }
-    
+
     with app.app_context():
         response = client.post('/api/v1/auth/register', json=user_data)
         if response.status_code == 201:
@@ -104,10 +136,11 @@ def registered_user(app, client):
             return {
                 'email': user_data['email'],
                 'password': user_data['password'],
-                'user_id': data.get('user', {}).get('id')
+                'user_id': data.get('user', {}).get('id'),
+                'access_token': data.get('access_token')
             }
-    
-    # Fallback si l'endpoint n'existe pas
+
+    # Fallback si l'endpoint échoue
     return {
         'email': user_data['email'],
         'password': user_data['password'],
@@ -124,14 +157,14 @@ def setup_colli(app, client, auth_headers, sample_colli_data):
             headers=auth_headers,
             json=sample_colli_data
         )
-        
+
         if response.status_code == 201:
             data = response.get_json()
             return {
                 'colli_id': data.get('id'),
                 'name': sample_colli_data['name']
             }
-    
+
     # Fallback
     return {
         'colli_id': str(uuid4()),

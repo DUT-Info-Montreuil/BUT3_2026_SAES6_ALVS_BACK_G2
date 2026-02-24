@@ -136,9 +136,10 @@ class TestColliMembership:
         colli = Colli.create(name="Test", theme="Thème", creator_id=uuid4())
         colli.approve()
         user_id = uuid4()
-        
+
         membership = colli.add_member(user_id, MemberRole.MEMBER)
-        
+        colli.accept_member(user_id)
+
         assert colli.is_member(user_id)
         assert membership.role == MemberRole.MEMBER
     
@@ -166,9 +167,10 @@ class TestColliMembership:
         colli.approve()
         user_id = uuid4()
         colli.add_member(user_id)
-        
+        colli.accept_member(user_id)
+
         colli.remove_member(user_id)
-        
+
         assert not colli.is_member(user_id)
     
     def test_remove_non_member_raises_error(self):
@@ -185,9 +187,10 @@ class TestColliMembership:
         colli.approve()
         user_id = uuid4()
         colli.add_member(user_id, MemberRole.MEMBER)
-        
+        colli.accept_member(user_id)
+
         colli.promote_member(user_id, MemberRole.MODERATOR)
-        
+
         membership = colli.get_member(user_id)
         assert membership.role == MemberRole.MODERATOR
 

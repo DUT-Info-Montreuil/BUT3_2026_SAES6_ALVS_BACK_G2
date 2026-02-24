@@ -24,8 +24,10 @@ class TestAuthRoutes:
         
         assert response.status_code == 201
         data = response.get_json()
-        assert 'email' in data
-        assert 'first_name' in data
+        assert 'access_token' in data
+        assert 'user' in data
+        assert data['user']['email'] == data['user']['email']
+        assert data['user']['first_name'] == 'John'
     
     def test_register_duplicate_email(self, client):
         """POST /api/v1/auth/register - Email dupliqué refusé."""

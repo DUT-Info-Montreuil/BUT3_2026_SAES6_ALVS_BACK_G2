@@ -1,0 +1,74 @@
+# .dockerignore
+
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv
+venv/
+ENV/
+.eggs/
+*.egg-info/
+*.egg
+
+# Tests
+.pytest_cache
+.coverage
+htmlcov/
+.tox
+.nox
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+
+# Data (ne pas inclure la BDD SQLite dev)
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Uploads (montés en volume)
+static/uploads/*
+!static/uploads/.gitkeep
+
+# Documentation build
+docs/_build/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temp
+*.tmp
+*.temp
+tmp/
+temp/
+
+# Coverage reports
+coverage.xml
+*.cover
+
+# Misc
+*.bak
+*.old
+README.md
+CHANGELOG.md
+CONTRIBUTING.md

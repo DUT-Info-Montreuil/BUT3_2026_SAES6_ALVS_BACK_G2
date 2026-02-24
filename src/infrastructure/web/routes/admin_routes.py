@@ -300,16 +300,12 @@ def get_stats(
     all_comments = comment_repo.find_all() if hasattr(comment_repo, 'find_all') else []
     
     return jsonify({
-        'users': {
-            'total': len(all_users),
-            'by_role': users_by_role
-        },
-        'collis': {
-            'total': len(all_collis),
-            'by_status': collis_by_status
-        },
-        'letters': len(all_letters),
-        'comments': len(all_comments)
+        'total_users': len(all_users),
+        'total_collis': len(all_collis),
+        'active_collis': collis_by_status.get('active', 0),
+        'pending_collis': collis_by_status.get('pending', 0),
+        'total_letters': len(all_letters),
+        'total_comments': len(all_comments),
     }), HTTPStatus.OK
 
 

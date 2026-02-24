@@ -20,7 +20,7 @@ comment_bp = Blueprint('comments', __name__, url_prefix='/api/v1/letters/<uuid:l
 
 
 @comment_bp.post('')
-@require_auth
+@jwt_required()
 @inject
 def create_comment(
     letter_id: UUID,
@@ -67,7 +67,7 @@ def create_comment(
         $ref: '#/components/responses/NotFound'
     """
     data = request.get_json() or {}
-    sender_id = get_current_user_id()
+    sender_id = get_jwt_identity()
     
     if not data.get('content'):
         raise ValidationException("Le contenu est obligatoire")
@@ -82,7 +82,7 @@ def create_comment(
 
 
 @comment_bp.get('')
-@require_auth
+@jwt_required()
 @inject
 def list_comments(
     letter_id: UUID,
@@ -133,7 +133,7 @@ def list_comments(
       404:
         $ref: '#/components/responses/NotFound'
     """
-    user_id = get_current_user_id()
+    user_id = get_jwt_identity()
     page = request.args.get('page', 1, type=int)
     per_page = min(request.args.get('per_page', 50, type=int), 100)
     
@@ -142,7 +142,7 @@ def list_comments(
 
 
 @comment_bp.delete('/<uuid:comment_id>')
-@require_auth
+@jwt_required()
 @inject
 def delete_comment(
     letter_id: UUID,
@@ -180,13 +180,13 @@ def delete_comment(
       404:
         $ref: '#/components/responses/NotFound'
     """
-    user_id = get_current_user_id()
+    user_id = get_jwt_identity()
     use_case.execute(comment_id, user_id)
     return '', HTTPStatus.NO_CONTENT
 
 
 @comment_bp.patch('/<uuid:comment_id>')
-@require_auth
+@jwt_required()
 @inject
 def update_comment(
     letter_id: UUID,
@@ -249,7 +249,7 @@ def update_comment(
     if not content:
         raise ValidationException("Le contenu est requis", errors={"content": ["Champ requis"]})
     
-    user_id = get_current_user_id()
+    user_id = get_jwt_identity()
     
     result = use_case.execute(UpdateCommentCommand(
         comment_id=comment_id,

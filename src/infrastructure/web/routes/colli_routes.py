@@ -30,10 +30,12 @@ from src.application.use_cases.colli.membership import JoinColliUseCase, LeaveCo
 from src.infrastructure.container import Container
 
 
-colli_bp = Blueprint('collis', __name__, url_prefix='/api/v1/collis')
+# Utiliser un nom unique pour éviter les conflits de blueprint
+colli_bp = Blueprint('colli_routes_v1', __name__, url_prefix='/api/v1/collis')
 
 
 @colli_bp.post('')
+@jwt_required()
 @require_role([UserRole.TEACHER, UserRole.ADMIN])
 @inject
 def create_colli(
@@ -84,7 +86,7 @@ def create_colli(
     except ValidationError as err:
         raise ValidationException("Données invalides", errors=err.messages)
     
-    creator_id = get_current_user_id()
+    creator_id = get_jwt_identity()
     
     result = use_case.execute(CreateColliCommand(
         name=data['name'],
@@ -97,7 +99,7 @@ def create_colli(
 
 
 @colli_bp.get('')
-@require_auth
+@jwt_required()
 @inject
 def list_collis(
     use_case: ListCollisUseCase = Provide[Container.list_collis_use_case]
@@ -157,7 +159,7 @@ def list_collis(
 
 
 @colli_bp.get('/<uuid:colli_id>')
-@require_auth
+@jwt_required()
 @inject
 def get_colli(
     colli_id: UUID,
@@ -190,13 +192,13 @@ def get_colli(
       404:
         $ref: '#/components/responses/NotFound'
     """
-    user_id = get_current_user_id()
+    user_id = get_jwt_identity()
     result = use_case.execute(colli_id, user_id)
     return jsonify(result.to_dict()), HTTPStatus.OK
 
 
 @colli_bp.delete('/<uuid:colli_id>')
-@require_auth
+@jwt_required()
 @inject
 def delete_colli(
     colli_id: UUID,
@@ -227,12 +229,13 @@ def delete_colli(
       404:
         $ref: '#/components/responses/NotFound'
     """
-    user_id = get_current_user_id()
+    user_id = get_jwt_identity()
     use_case.execute(colli_id, user_id)
     return '', HTTPStatus.NO_CONTENT
 
 
 @colli_bp.patch('/<uuid:colli_id>/approve')
+@jwt_required()
 @require_role([UserRole.ADMIN])
 @inject
 def approve_colli(
@@ -268,7 +271,7 @@ def approve_colli(
       404:
         $ref: '#/components/responses/NotFound'
     """
-    approver_id = get_current_user_id()
+    approver_id = get_jwt_identity()
     
     result = use_case.execute(ApproveColliCommand(
         colli_id=colli_id,
@@ -279,7 +282,7 @@ def approve_colli(
 
 
 @colli_bp.post('/<uuid:colli_id>/join')
-@require_auth
+@jwt_required()
 @inject
 def join_colli(
     colli_id: UUID,
@@ -315,13 +318,13 @@ def join_colli(
       404:
         $ref: '#/components/responses/NotFound'
     """
-    user_id = get_current_user_id()
+    user_id = get_jwt_identity()
     result = use_case.execute(colli_id, user_id)
     return jsonify(result.to_dict()), HTTPStatus.OK
 
 
 @colli_bp.post('/<uuid:colli_id>/leave')
-@require_auth
+@jwt_required()
 @inject
 def leave_colli(
     colli_id: UUID,
@@ -350,13 +353,13 @@ def leave_colli(
       404:
         $ref: '#/components/responses/NotFound'
     """
-    user_id = get_current_user_id()
+    user_id = get_jwt_identity()
     use_case.execute(colli_id, user_id)
     return '', HTTPStatus.NO_CONTENT
 
 
 @colli_bp.get('/<uuid:colli_id>/members')
-@require_auth
+@jwt_required()
 @inject
 def list_members(
     colli_id: UUID,
@@ -391,13 +394,13 @@ def list_members(
       404:
         $ref: '#/components/responses/NotFound'
     """
-    user_id = get_current_user_id()
+    user_id = get_jwt_identity()
     result = use_case.execute(colli_id, user_id)
     return jsonify(result), HTTPStatus.OK
 
 
 @colli_bp.get('/mine')
-@require_auth
+@jwt_required()
 @inject
 def get_my_collis(
     use_case = Provide[Container.get_user_collis_use_case]
@@ -446,7 +449,7 @@ def get_my_collis(
     """
     from src.application.use_cases.colli.get_user_collis import ColliRoleFilter
     
-    user_id = get_current_user_id()
+    user_id = get_jwt_identity()
     role_str = request.args.get('role', 'all')
     page = request.args.get('page', 1, type=int)
     per_page = min(request.args.get('per_page', 20, type=int), 100)
@@ -461,7 +464,7 @@ def get_my_collis(
 
 
 @colli_bp.patch('/<uuid:colli_id>')
-@require_auth
+@jwt_required()
 @inject
 def update_colli(
     colli_id: UUID,
@@ -517,7 +520,7 @@ def update_colli(
     except ValidationError as err:
         raise ValidationException("Donnees invalides", errors=err.messages)
     
-    user_id = get_current_user_id()
+    user_id = get_jwt_identity()
     
     result = use_case.execute(UpdateColliCommand(
         colli_id=colli_id,
@@ -531,6 +534,7 @@ def update_colli(
 
 
 @colli_bp.patch('/<uuid:colli_id>/reject')
+@jwt_required()
 @require_role([UserRole.ADMIN])
 @inject
 def reject_colli(
@@ -578,7 +582,7 @@ def reject_colli(
     from src.application.use_cases.colli.reject_colli import RejectColliCommand
     
     data = request.get_json() or {}
-    admin_id = get_current_user_id()
+    admin_id = get_jwt_identity()
     
     result = use_case.execute(RejectColliCommand(
         colli_id=colli_id,

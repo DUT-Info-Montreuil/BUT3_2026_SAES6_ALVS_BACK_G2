@@ -20,7 +20,7 @@ letter_bp = Blueprint('letters', __name__, url_prefix='/api/v1/collis/<uuid:coll
 
 
 @letter_bp.post('')
-@require_auth
+@jwt_required()
 @inject
 def create_letter(
     colli_id: UUID,
@@ -80,7 +80,7 @@ def create_letter(
         $ref: '#/components/responses/NotFound'
     """
     data = request.get_json() or {}
-    sender_id = get_current_user_id()
+    sender_id = get_jwt_identity()
     letter_type = data.get('letter_type', 'text')
     
     if letter_type == 'text':
@@ -110,7 +110,7 @@ def create_letter(
 
 
 @letter_bp.get('')
-@require_auth
+@jwt_required()
 @inject
 def list_letters(
     colli_id: UUID,
@@ -161,7 +161,7 @@ def list_letters(
       404:
         $ref: '#/components/responses/NotFound'
     """
-    user_id = get_current_user_id()
+    user_id = get_jwt_identity()
     page = request.args.get('page', 1, type=int)
     per_page = min(request.args.get('per_page', 20, type=int), 100)
     
@@ -170,7 +170,7 @@ def list_letters(
 
 
 @letter_bp.get('/<uuid:letter_id>')
-@require_auth
+@jwt_required()
 @inject
 def get_letter(
     colli_id: UUID,
@@ -210,13 +210,13 @@ def get_letter(
       404:
         $ref: '#/components/responses/NotFound'
     """
-    user_id = get_current_user_id()
+    user_id = get_jwt_identity()
     result = use_case.execute(letter_id, user_id)
     return jsonify(result.to_dict()), HTTPStatus.OK
 
 
 @letter_bp.delete('/<uuid:letter_id>')
-@require_auth
+@jwt_required()
 @inject
 def delete_letter(
     colli_id: UUID,
@@ -254,13 +254,13 @@ def delete_letter(
       404:
         $ref: '#/components/responses/NotFound'
     """
-    user_id = get_current_user_id()
+    user_id = get_jwt_identity()
     use_case.execute(letter_id, user_id)
     return '', HTTPStatus.NO_CONTENT
 
 
 @letter_bp.patch('/<uuid:letter_id>')
-@require_auth
+@jwt_required()
 @inject
 def update_letter(
     colli_id: UUID,
@@ -316,7 +316,7 @@ def update_letter(
     from src.application.use_cases.letter.update_letter import UpdateLetterCommand
     
     data = request.get_json() or {}
-    user_id = get_current_user_id()
+    user_id = get_jwt_identity()
     
     result = use_case.execute(UpdateLetterCommand(
         letter_id=letter_id,

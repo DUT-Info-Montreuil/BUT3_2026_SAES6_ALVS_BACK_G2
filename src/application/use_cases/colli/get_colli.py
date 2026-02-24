@@ -21,6 +21,21 @@ class GetColliByIdUseCase:
         if not colli:
             raise NotFoundException(f"COLLI {colli_id} introuvable")
         
+        # Vérifier que l'utilisateur a accès au COLLI
+        # Accès autorisé si :
+        # - Le COLLI est actif (approuvé)
+        # - OU l'utilisateur est le créateur
+        # - OU l'utilisateur est membre du COLLI
+        has_access = (
+            colli.is_active or 
+            colli.creator_id == user_id or 
+            colli.is_member(user_id)
+        )
+        
+        if not has_access:
+            # Retourner 404 au lieu de 403 pour ne pas révéler l'existence du COLLI
+            raise NotFoundException(f"COLLI {colli_id} introuvable")
+        
         return ColliResponseDTO.from_entity(colli)
 
 
@@ -32,6 +47,7 @@ class ListCollisUseCase:
     
     def execute(self, page: int = 1, per_page: int = 20) -> dict:
         """Liste les COLLIs paginés."""
+        # Pour l'instant, on liste tous les COLLIs actifs
         collis = self._colli_repo.find_all(page, per_page)
         total = self._colli_repo.count()
         

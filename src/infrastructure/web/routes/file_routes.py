@@ -6,6 +6,7 @@ from flask import Blueprint, request, jsonify, send_file
 from http import HTTPStatus
 
 from src.infrastructure.web.middlewares.auth_middleware import require_auth, get_current_user_id
+from src.infrastructure.web.middlewares.rate_limiter import limiter
 from src.application.exceptions import ValidationException, NotFoundException
 from src.infrastructure.storage.file_storage import get_file_storage
 
@@ -14,6 +15,7 @@ file_bp = Blueprint('files', __name__, url_prefix='/api/v1/files')
 
 
 @file_bp.post('/upload')
+@limiter.limit("10 per hour")
 @require_auth
 def upload_file():
     """
@@ -190,6 +192,7 @@ def check_file(file_id: str):
 
 
 @file_bp.put('/<file_id>')
+@limiter.limit("10 per hour")
 @require_auth
 def replace_file(file_id: str):
     """

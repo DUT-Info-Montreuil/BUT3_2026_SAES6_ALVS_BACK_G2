@@ -3,7 +3,7 @@
 
 from functools import wraps
 from typing import List, Callable
-from flask import request, g
+from flask import request, g, current_app
 from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity, get_jwt
 from uuid import UUID
 
@@ -21,6 +21,12 @@ def require_auth(fn: Callable) -> Callable:
     @wraps(fn)
     def wrapper(*args, **kwargs):
         try:
+            # Configurer JWT si nécessaire
+            if not hasattr(current_app.config, 'JWT_TOKEN_LOCATION'):
+                current_app.config['JWT_TOKEN_LOCATION'] = ['headers']
+                current_app.config['JWT_HEADER_NAME'] = 'Authorization'
+                current_app.config['JWT_HEADER_TYPE'] = 'Bearer'
+            
             verify_jwt_in_request()
         except Exception as e:
             raise UnauthorizedException("Token d'authentification invalide ou manquant")
@@ -60,6 +66,12 @@ def require_role(allowed_roles: List[UserRole]) -> Callable:
         def wrapper(*args, **kwargs):
             # D'abord vérifier l'authentification
             try:
+                # Configurer JWT si nécessaire
+                if not hasattr(current_app.config, 'JWT_TOKEN_LOCATION'):
+                    current_app.config['JWT_TOKEN_LOCATION'] = ['headers']
+                    current_app.config['JWT_HEADER_NAME'] = 'Authorization'
+                    current_app.config['JWT_HEADER_TYPE'] = 'Bearer'
+                
                 verify_jwt_in_request()
             except Exception:
                 raise UnauthorizedException("Authentification requise")

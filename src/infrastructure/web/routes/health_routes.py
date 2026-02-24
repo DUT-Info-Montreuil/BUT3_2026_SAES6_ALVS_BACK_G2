@@ -16,9 +16,29 @@ logger = logging.getLogger(__name__)
 @health_bp.get('/health')
 def health_check():
     """
-    Vérifie la santé de l'application.
-    
-    Utilisé par les load balancers et le monitoring.
+    Vérifie la santé de l'application
+    ---
+    tags:
+      - Health
+    summary: Liveness probe
+    description: Utilisé par les load balancers et le monitoring pour vérifier que l'application est en vie.
+    responses:
+      200:
+        description: Application en bonne santé
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  example: healthy
+                timestamp:
+                  type: string
+                  format: date-time
+                service:
+                  type: string
+                  example: alvs-api
     """
     return jsonify({
         'status': 'healthy',
@@ -30,9 +50,41 @@ def health_check():
 @health_bp.get('/ready')
 def readiness_check():
     """
-    Vérifie que l'application est prête à recevoir du trafic.
-    
-    Inclut la vérification des dépendances (DB, Redis, etc.).
+    Vérifie que l'application est prête à recevoir du trafic
+    ---
+    tags:
+      - Health
+    summary: Readiness probe
+    description: >
+      Vérifie que l'application et ses dépendances (DB, Redis) sont prêtes
+      à recevoir du trafic.
+    responses:
+      200:
+        description: Application prête
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ready:
+                  type: boolean
+                checks:
+                  type: object
+                  properties:
+                    config:
+                      type: string
+                      enum: [ok, error]
+                    database:
+                      type: string
+                      enum: [ok, in_memory, error]
+                    redis:
+                      type: string
+                      enum: [ok, disabled, unavailable]
+                timestamp:
+                  type: string
+                  format: date-time
+      503:
+        description: Application non prête (dépendance critique en erreur)
     """
     checks = {}
     
@@ -83,7 +135,34 @@ def readiness_check():
 
 @health_bp.get('/version')
 def version_info():
-    """Retourne les informations de version."""
+    """
+    Informations de version
+    ---
+    tags:
+      - Health
+    summary: Version de l'API
+    description: Retourne la version et l'environnement de l'API.
+    responses:
+      200:
+        description: Informations de version
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                service:
+                  type: string
+                  example: alvs-api
+                version:
+                  type: string
+                  example: 1.0.0
+                environment:
+                  type: string
+                  example: development
+                timestamp:
+                  type: string
+                  format: date-time
+    """
     return jsonify({
         'service': 'alvs-api',
         'version': '1.0.0',

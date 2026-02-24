@@ -176,23 +176,31 @@ def list_reports():
       403:
         $ref: '#/components/responses/Forbidden'
     """
+    page = request.args.get('page', 1, type=int)
+    per_page = min(request.args.get('per_page', 20, type=int), 100)
     status_filter = request.args.get('status')
     type_filter = request.args.get('target_type')
-    
+
     reports = list(_reports.values())
-    
+
     if status_filter:
         reports = [r for r in reports if r['status'] == status_filter]
-    
+
     if type_filter:
         reports = [r for r in reports if r['target_type'] == type_filter]
-    
+
     # Trier par date (plus recent en premier)
     reports.sort(key=lambda r: r['created_at'], reverse=True)
-    
+
+    total = len(reports)
+    start = (page - 1) * per_page
+    paginated = reports[start:start + per_page]
+
     return jsonify({
-        'items': reports,
-        'total': len(reports)
+        'items': paginated,
+        'total': total,
+        'page': page,
+        'per_page': per_page
     }), HTTPStatus.OK
 
 

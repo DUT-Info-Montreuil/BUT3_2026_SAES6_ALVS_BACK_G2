@@ -10,7 +10,7 @@ class LetterMapper:
     """
     Mapper bidirectionnel Letter Entity ↔ LetterModel ORM.
     """
-    
+
     @staticmethod
     def to_entity(model: LetterModel) -> Letter:
         """
@@ -27,7 +27,7 @@ class LetterMapper:
             created_at=model.created_at,
             updated_at=model.updated_at
         )
-    
+
     @staticmethod
     def to_model(entity: Letter) -> LetterModel:
         """
@@ -44,7 +44,7 @@ class LetterMapper:
             created_at=entity.created_at,
             updated_at=entity.updated_at
         )
-    
+
     @staticmethod
     def update_model(model: LetterModel, entity: Letter) -> LetterModel:
         """

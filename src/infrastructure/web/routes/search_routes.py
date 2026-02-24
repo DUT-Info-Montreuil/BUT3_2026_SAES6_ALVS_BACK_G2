@@ -1,14 +1,14 @@
 # src/infrastructure/web/routes/search_routes.py
 """Routes de recherche globale avec documentation OpenAPI."""
 
-from flask import Blueprint, request, jsonify
 from http import HTTPStatus
-from dependency_injector.wiring import inject, Provide
 
+from dependency_injector.wiring import Provide, inject
+from flask import Blueprint, jsonify, request
+
+from src.infrastructure.container import Container
 from src.infrastructure.web.middlewares.auth_middleware import require_auth
 from src.infrastructure.web.middlewares.rate_limiter import limiter
-from src.infrastructure.container import Container
-
 
 search_bp = Blueprint('search', __name__, url_prefix='/api/v1/search')
 
@@ -81,30 +81,30 @@ def global_search(
     from src.application.dtos.letter_dto import LetterResponseDTO
     from src.application.dtos.user_dto import UserResponseDTO
     from src.application.exceptions import ValidationException
-    
+
     query = request.args.get('q', '').strip().lower()
     search_type = request.args.get('type', 'all')
     limit = min(request.args.get('limit', 10, type=int), 50)
-    
+
     if len(query) < 2:
         raise ValidationException(
             "Le terme de recherche doit contenir au moins 2 caracteres",
             errors={"q": ["Minimum 2 caracteres"]}
         )
-    
+
     results = {'query': query}
-    
+
     # Recherche COLLIs
     if search_type in ['all', 'collis']:
         all_collis = colli_repo.find_all() if hasattr(colli_repo, 'find_all') else []
         matching_collis = [
             c for c in all_collis
-            if query in c.name.lower() 
+            if query in c.name.lower()
             or query in c.theme.lower()
             or (c.description and query in c.description.lower())
         ][:limit]
         results['collis'] = [ColliResponseDTO.from_entity(c).to_dict() for c in matching_collis]
-    
+
     # Recherche Lettres
     if search_type in ['all', 'letters']:
         all_letters = letter_repo.find_all() if hasattr(letter_repo, 'find_all') else []
@@ -114,7 +114,7 @@ def global_search(
             or (hasattr(l, 'description') and l.description and query in l.description.lower())
         ][:limit]
         results['letters'] = [LetterResponseDTO.from_entity(l).to_dict() for l in matching_letters]
-    
+
     # Recherche Utilisateurs
     if search_type in ['all', 'users']:
         all_users = user_repo.find_all() if hasattr(user_repo, 'find_all') else []
@@ -125,5 +125,5 @@ def global_search(
             or query in u.last_name.lower()
         ][:limit]
         results['users'] = [UserResponseDTO.from_entity(u).to_dict() for u in matching_users]
-    
+
     return jsonify(results), HTTPStatus.OK

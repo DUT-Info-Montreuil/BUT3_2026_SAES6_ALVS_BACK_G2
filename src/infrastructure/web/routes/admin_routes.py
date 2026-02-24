@@ -1,16 +1,16 @@
 # src/infrastructure/web/routes/admin_routes.py
 """Routes d'administration avec documentation OpenAPI."""
 
-from flask import Blueprint, request, jsonify
 from http import HTTPStatus
 from uuid import UUID
-from dependency_injector.wiring import inject, Provide
 
-from src.infrastructure.web.middlewares.auth_middleware import require_role, get_current_user_id
+from dependency_injector.wiring import Provide, inject
+from flask import Blueprint, jsonify, request
+
+from src.application.exceptions import NotFoundException, ValidationException
 from src.domain.identity.value_objects.user_role import UserRole
-from src.application.exceptions import ValidationException, NotFoundException
 from src.infrastructure.container import Container
-
+from src.infrastructure.web.middlewares.auth_middleware import get_current_user_id, require_role
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/api/v1/admin')
 
@@ -73,10 +73,10 @@ def list_users(
     search = request.args.get('search', '').lower()
     page = request.args.get('page', 1, type=int)
     per_page = min(request.args.get('per_page', 20, type=int), 100)
-    
+
     # Recuperer tous les users (in-memory)
     all_users = user_repo.find_all() if hasattr(user_repo, 'find_all') else []
-    
+
     # Filtrer par role
     if role_filter:
         try:
@@ -84,24 +84,24 @@ def list_users(
             all_users = [u for u in all_users if u.role == target_role]
         except ValueError:
             pass
-    
+
     # Filtrer par recherche
     if search:
         all_users = [
-            u for u in all_users 
-            if search in u.email.lower() 
-            or search in u.first_name.lower() 
+            u for u in all_users
+            if search in u.email.lower()
+            or search in u.first_name.lower()
             or search in u.last_name.lower()
         ]
-    
+
     # Pagination
     total = len(all_users)
     start = (page - 1) * per_page
     end = start + per_page
     paginated = all_users[start:end]
-    
+
     from src.application.dtos.user_dto import UserResponseDTO
-    
+
     return jsonify({
         'items': [UserResponseDTO.from_entity(u).to_dict() for u in paginated],
         'total': total,
@@ -149,7 +149,7 @@ def get_user(
     user = user_repo.find_by_id(user_id)
     if not user:
         raise NotFoundException(f"Utilisateur {user_id} non trouve")
-    
+
     from src.application.dtos.user_dto import UserResponseDTO
     return jsonify(UserResponseDTO.from_entity(user).to_dict()), HTTPStatus.OK
 
@@ -205,10 +205,10 @@ def update_user_role(
     """
     data = request.get_json() or {}
     new_role_str = data.get('role')
-    
+
     if not new_role_str:
         raise ValidationException("Le role est requis", errors={"role": ["Champ requis"]})
-    
+
     try:
         new_role = UserRole(new_role_str)
     except ValueError:
@@ -216,19 +216,19 @@ def update_user_role(
             f"Role invalide: {new_role_str}",
             errors={"role": [f"Valeurs valides: {', '.join(r.value for r in UserRole)}"]}
         )
-    
+
     user = user_repo.find_by_id(user_id)
     if not user:
         raise NotFoundException(f"Utilisateur {user_id} non trouve")
-    
+
     # Empecher de se retirer soi-meme le role admin
     current_user_id = get_current_user_id()
     if user_id == current_user_id and new_role != UserRole.ADMIN:
         raise ValidationException("Vous ne pouvez pas retirer votre propre role admin")
-    
+
     user.role = new_role
     user_repo.save(user)
-    
+
     from src.application.dtos.user_dto import UserResponseDTO
     return jsonify(UserResponseDTO.from_entity(user).to_dict()), HTTPStatus.OK
 
@@ -287,18 +287,18 @@ def get_stats(
     for user in all_users:
         role = user.role.value
         users_by_role[role] = users_by_role.get(role, 0) + 1
-    
+
     # Comptage COLLIs
     all_collis = colli_repo.find_all() if hasattr(colli_repo, 'find_all') else []
     collis_by_status = {}
     for colli in all_collis:
         status = colli.status.value
         collis_by_status[status] = collis_by_status.get(status, 0) + 1
-    
+
     # Comptage lettres et commentaires
     all_letters = letter_repo.find_all() if hasattr(letter_repo, 'find_all') else []
     all_comments = comment_repo.find_all() if hasattr(comment_repo, 'find_all') else []
-    
+
     return jsonify({
         'users': {
             'total': len(all_users),
@@ -366,42 +366,42 @@ def create_user(
       409:
         description: Email deja utilise
     """
+    from src.application.dtos.user_dto import UserResponseDTO
     from src.domain.identity.entities.user import User
     from src.domain.identity.value_objects.hashed_password import HashedPassword
-    from src.application.dtos.user_dto import UserResponseDTO
-    
+
     data = request.get_json() or {}
-    
+
     # Validation
     required = ['email', 'password', 'first_name', 'last_name']
     errors = {}
     for field in required:
         if not data.get(field):
             errors[field] = ["Champ requis"]
-    
+
     if errors:
         raise ValidationException("Donnees invalides", errors=errors)
-    
+
     if len(data['password']) < 8:
         raise ValidationException(
             "Mot de passe trop court",
             errors={"password": ["Minimum 8 caracteres"]}
         )
-    
+
     # Verifier email unique
     if user_repo.find_by_email(data['email']):
         raise ValidationException(
             "Email deja utilise",
             errors={"email": ["Un compte existe deja avec cet email"]}
         )
-    
+
     # Determiner le role
     role_str = data.get('role', 'member')
     try:
         role = UserRole(role_str)
     except ValueError:
         role = UserRole.MEMBER
-    
+
     # Creer l'utilisateur
     user = User(
         email=data['email'],
@@ -410,9 +410,9 @@ def create_user(
         last_name=data['last_name'],
         role=role
     )
-    
+
     user_repo.save(user)
-    
+
     return jsonify(UserResponseDTO.from_entity(user).to_dict()), HTTPStatus.CREATED
 
 
@@ -451,12 +451,12 @@ def delete_user(
     user = user_repo.find_by_id(user_id)
     if not user:
         raise NotFoundException(f"Utilisateur {user_id} non trouve")
-    
+
     # Empecher de se supprimer soi-meme
     current_user_id = get_current_user_id()
     if user_id == current_user_id:
         raise ValidationException("Vous ne pouvez pas supprimer votre propre compte")
-    
+
     user_repo.delete(user_id)
-    
+
     return '', HTTPStatus.NO_CONTENT

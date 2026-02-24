@@ -1,7 +1,7 @@
 # src/infrastructure/web/schemas/auth_schema.py
 """Schémas de validation pour l'authentification."""
 
-from marshmallow import Schema, fields, validate, validates, ValidationError
+from marshmallow import Schema, ValidationError, fields, validate, validates
 
 
 class LoginSchema(Schema):
@@ -29,7 +29,7 @@ class RegisterSchema(Schema):
     password_confirm = fields.String(required=True)
     first_name = fields.String(required=True, validate=validate.Length(min=1, max=100))
     last_name = fields.String(required=True, validate=validate.Length(min=1, max=100))
-    
+
     @validates('password_confirm')
     def validate_password_confirm(self, value):
         """Vérifie que password_confirm est présent."""

@@ -3,22 +3,23 @@
 
 from typing import Optional
 from uuid import UUID
-from datetime import datetime
 
 from src.domain.notification.entities.notification import Notification, NotificationType
-from src.infrastructure.persistence.in_memory.notification_repository import InMemoryNotificationRepository
+from src.infrastructure.persistence.in_memory.notification_repository import (
+    InMemoryNotificationRepository,
+)
 
 
 class NotificationService:
     """
     Service centralise pour la gestion des notifications.
-    
+
     Cree les notifications en base ET les envoie en temps reel via WebSocket.
     """
-    
+
     def __init__(self, notification_repo: InMemoryNotificationRepository = None):
         self._repo = notification_repo or InMemoryNotificationRepository()
-    
+
     def create_notification(
         self,
         user_id: UUID,
@@ -30,7 +31,7 @@ class NotificationService:
     ) -> Notification:
         """
         Cree une notification et l'envoie en temps reel.
-        
+
         Args:
             user_id: ID de l'utilisateur destinataire
             notification_type: Type de notification
@@ -38,7 +39,7 @@ class NotificationService:
             message: Message
             related_entity_id: ID de l'entite liee (optionnel)
             related_entity_type: Type de l'entite liee (optionnel)
-            
+
         Returns:
             Notification creee
         """
@@ -51,10 +52,10 @@ class NotificationService:
             related_entity_id=related_entity_id,
             related_entity_type=related_entity_type
         )
-        
+
         # Sauvegarder en base
         self._repo.save(notification)
-        
+
         # Envoyer en temps reel via WebSocket
         try:
             from src.infrastructure.websocket import push_notification
@@ -62,9 +63,9 @@ class NotificationService:
         except Exception:
             # WebSocket peut ne pas etre disponible (tests, etc.)
             pass
-        
+
         return notification
-    
+
     def notify_new_letter(
         self,
         colli_id: UUID,
@@ -83,7 +84,7 @@ class NotificationService:
                 related_entity_id=letter_id,
                 related_entity_type="letter"
             )
-    
+
     def notify_new_comment(
         self,
         letter_id: UUID,
@@ -99,7 +100,7 @@ class NotificationService:
             related_entity_id=letter_id,
             related_entity_type="letter"
         )
-    
+
     def notify_colli_approved(
         self,
         colli_id: UUID,
@@ -115,7 +116,7 @@ class NotificationService:
             related_entity_id=colli_id,
             related_entity_type="colli"
         )
-    
+
     def notify_colli_rejected(
         self,
         colli_id: UUID,
@@ -127,7 +128,7 @@ class NotificationService:
         message = f"Votre COLLI '{colli_name}' a ete rejete"
         if reason:
             message += f": {reason}"
-        
+
         self.create_notification(
             user_id=creator_id,
             notification_type=NotificationType.COLLI_REJECTED,
@@ -136,7 +137,7 @@ class NotificationService:
             related_entity_id=colli_id,
             related_entity_type="colli"
         )
-    
+
     def notify_user_joined(
         self,
         colli_id: UUID,

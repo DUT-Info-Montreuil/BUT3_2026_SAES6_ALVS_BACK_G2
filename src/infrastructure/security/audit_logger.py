@@ -1,12 +1,12 @@
 # src/infrastructure/security/audit_logger.py
 """Audit logging pour les evenements de securite."""
 
-import logging
 import json
+import logging
 import os
 from datetime import datetime
-from typing import Optional, Dict, Any
 from enum import Enum
+from typing import Any, Dict, Optional
 
 
 class AuditEvent(Enum):
@@ -20,13 +20,13 @@ class AuditEvent(Enum):
     PASSWORD_CHANGED = "password_changed"
     PASSWORD_RESET_REQUESTED = "password_reset_requested"
     PASSWORD_RESET_COMPLETED = "password_reset_completed"
-    
+
     # User
     USER_CREATED = "user_created"
     USER_UPDATED = "user_updated"
     USER_DELETED = "user_deleted"
     ROLE_CHANGED = "role_changed"
-    
+
     # Content
     COLLI_CREATED = "colli_created"
     COLLI_APPROVED = "colli_approved"
@@ -34,11 +34,11 @@ class AuditEvent(Enum):
     LETTER_CREATED = "letter_created"
     COMMENT_CREATED = "comment_created"
     REPORT_CREATED = "report_created"
-    
+
     # Data
     DATA_EXPORTED = "data_exported"
     DATA_DELETION_REQUESTED = "data_deletion_requested"
-    
+
     # Security
     SUSPICIOUS_ACTIVITY = "suspicious_activity"
     RATE_LIMIT_EXCEEDED = "rate_limit_exceeded"
@@ -79,7 +79,7 @@ def log_audit_event(
 ) -> None:
     """
     Log un evenement d'audit structure.
-    
+
     Args:
         event: Type d'evenement
         user_id: ID de l'utilisateur concerne
@@ -94,9 +94,9 @@ def log_audit_event(
         "ip_address": ip_address or "unknown",
         "details": details or {}
     }
-    
+
     message = json.dumps(log_data, ensure_ascii=False)
-    
+
     if level == "warning":
         audit_logger.warning(message)
     elif level == "error":
@@ -114,9 +114,9 @@ def log_login_success(user_id: str, ip_address: str) -> None:
 def log_login_failure(email: str, ip_address: str, reason: str) -> None:
     """Log un echec de connexion."""
     log_audit_event(
-        AuditEvent.LOGIN_FAILURE, 
-        None, 
-        ip_address, 
+        AuditEvent.LOGIN_FAILURE,
+        None,
+        ip_address,
         {"email": email, "reason": reason},
         "warning"
     )

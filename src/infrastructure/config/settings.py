@@ -68,11 +68,11 @@ class DevelopmentConfig(Config):
         # Fallbacks pour le développement
         if not secret_key:
             secret_key = secrets.token_urlsafe(32)
-            print("⚠️  SECRET_KEY generee automatiquement (dev uniquement)")
-        
+            print("[WARN] SECRET_KEY generee automatiquement (dev uniquement)")
+
         if not jwt_secret:
             jwt_secret = secrets.token_urlsafe(32)
-            print("⚠️  JWT_SECRET_KEY generee automatiquement (dev uniquement)")
+            print("[WARN] JWT_SECRET_KEY generee automatiquement (dev uniquement)")
         
         # Validation de la force des clés
         if len(secret_key) < 32:

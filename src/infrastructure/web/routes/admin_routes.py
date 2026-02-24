@@ -453,6 +453,6 @@ def delete_user(
     if user_id == current_user_id:
         raise ValidationException("Vous ne pouvez pas supprimer votre propre compte")
     
-    user_repo.delete(user_id)
+    user_repo.delete(user)
     
     return '', HTTPStatus.NO_CONTENT

@@ -1,10 +1,13 @@
 # src/infrastructure/config/settings.py
 """Configuration de l'application avec validation."""
 
+import logging
 import os
 import secrets
 from dataclasses import dataclass
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 from src.shared.domain_exception import ConfigurationError
 
@@ -71,11 +74,11 @@ class DevelopmentConfig(Config):
         # Fallbacks pour le développement
         if not secret_key:
             secret_key = secrets.token_urlsafe(32)
-            print("⚠️  SECRET_KEY generee automatiquement (dev uniquement)")
+            logger.warning("SECRET_KEY generee automatiquement (dev uniquement)")
         
         if not jwt_secret:
             jwt_secret = secrets.token_urlsafe(32)
-            print("⚠️  JWT_SECRET_KEY generee automatiquement (dev uniquement)")
+            logger.warning("JWT_SECRET_KEY generee automatiquement (dev uniquement)")
         
         # Validation de la force des clés
         if len(secret_key) < 32:

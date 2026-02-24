@@ -34,7 +34,7 @@ colli_bp = Blueprint('collis', __name__, url_prefix='/api/v1/collis')
 
 
 @colli_bp.post('')
-@require_role([UserRole.TEACHER, UserRole.ADMIN])
+@jwt_required()
 @inject
 def create_colli(
     use_case: CreateColliUseCase = Provide[Container.create_colli_use_case]

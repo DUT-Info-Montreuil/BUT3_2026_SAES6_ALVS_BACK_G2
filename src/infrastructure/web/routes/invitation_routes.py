@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from dependency_injector.wiring import inject, Provide
 
 from src.infrastructure.web.middlewares.auth_middleware import require_auth, require_role, get_current_user_id
+from src.infrastructure.web.middlewares.rate_limiter import limiter
 from src.domain.identity.value_objects.user_role import UserRole
 from src.application.exceptions import ValidationException, NotFoundException, ForbiddenException
 from src.infrastructure.container import Container
@@ -26,6 +27,7 @@ def _generate_invite_code() -> str:
 
 
 @invitation_bp.post('/collis/<uuid:colli_id>/invite')
+@limiter.limit("20 per hour")
 @require_auth
 @inject
 def create_invitation(

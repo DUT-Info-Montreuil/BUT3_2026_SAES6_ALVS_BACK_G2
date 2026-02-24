@@ -6,6 +6,7 @@ from http import HTTPStatus
 from dependency_injector.wiring import inject, Provide
 
 from src.infrastructure.web.middlewares.auth_middleware import require_auth
+from src.infrastructure.web.middlewares.rate_limiter import limiter
 from src.infrastructure.container import Container
 
 
@@ -13,6 +14,7 @@ search_bp = Blueprint('search', __name__, url_prefix='/api/v1/search')
 
 
 @search_bp.get('')
+@limiter.limit("30 per minute")
 @require_auth
 @inject
 def global_search(

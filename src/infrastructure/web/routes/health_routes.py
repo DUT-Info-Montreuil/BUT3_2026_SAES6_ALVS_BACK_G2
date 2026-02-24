@@ -1,13 +1,13 @@
 # src/infrastructure/web/routes/health_routes.py
 """Routes de santé pour le monitoring."""
 
-from flask import Blueprint, jsonify, current_app
-from http import HTTPStatus
-from datetime import datetime
 import logging
+from datetime import datetime
+from http import HTTPStatus
+
+from flask import Blueprint, current_app, jsonify
 
 from src.infrastructure.config.settings import get_settings
-
 
 health_bp = Blueprint('health', __name__)
 logger = logging.getLogger(__name__)
@@ -87,7 +87,7 @@ def readiness_check():
         description: Application non prête (dépendance critique en erreur)
     """
     checks = {}
-    
+
     # Vérifier la configuration
     try:
         settings = get_settings()
@@ -95,7 +95,7 @@ def readiness_check():
     except Exception as e:
         logger.error(f"Config check failed: {e}")
         checks['config'] = 'error'
-    
+
     # Vérifier la base de données
     try:
         from src.infrastructure.persistence.sqlalchemy.database import get_engine
@@ -106,7 +106,7 @@ def readiness_check():
     except Exception as e:
         logger.warning(f"Database check failed (may be using in-memory): {e}")
         checks['database'] = 'in_memory'  # Pas une erreur, peut être normal en dev
-    
+
     # Vérifier Redis (optionnel)
     try:
         import redis
@@ -120,12 +120,12 @@ def readiness_check():
     except Exception as e:
         logger.warning(f"Redis check failed: {e}")
         checks['redis'] = 'unavailable'
-    
+
     # Déterminer le statut global
     critical_checks = ['config']
     all_critical_ok = all(checks.get(c) == 'ok' for c in critical_checks)
     status = HTTPStatus.OK if all_critical_ok else HTTPStatus.SERVICE_UNAVAILABLE
-    
+
     return jsonify({
         'ready': all_critical_ok,
         'checks': checks,

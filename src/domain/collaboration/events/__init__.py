@@ -3,8 +3,8 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from uuid import UUID
 from typing import Optional
+from uuid import UUID
 
 
 @dataclass(frozen=True)
@@ -18,7 +18,7 @@ class ColliApproved(DomainEvent):
     """Événement émis quand un COLLI est approuvé."""
     colli_id: UUID = field(default=None)  # type: ignore
     approved_by: Optional[UUID] = None
-    
+
     def __post_init__(self):
         if self.colli_id is None:
             raise ValueError("colli_id is required")
@@ -30,7 +30,7 @@ class ColliRejected(DomainEvent):
     colli_id: UUID = field(default=None)  # type: ignore
     rejected_by: Optional[UUID] = None
     reason: Optional[str] = None
-    
+
     def __post_init__(self):
         if self.colli_id is None:
             raise ValueError("colli_id is required")
@@ -42,7 +42,7 @@ class MemberAdded(DomainEvent):
     colli_id: UUID = field(default=None)  # type: ignore
     user_id: UUID = field(default=None)  # type: ignore
     role: str = field(default=None)  # type: ignore
-    
+
     def __post_init__(self):
         if self.colli_id is None or self.user_id is None or self.role is None:
             raise ValueError("colli_id, user_id and role are required")
@@ -53,7 +53,7 @@ class MemberRemoved(DomainEvent):
     """Événement émis quand un membre est retiré d'un COLLI."""
     colli_id: UUID = field(default=None)  # type: ignore
     user_id: UUID = field(default=None)  # type: ignore
-    
+
     def __post_init__(self):
         if self.colli_id is None or self.user_id is None:
             raise ValueError("colli_id and user_id are required")
@@ -65,7 +65,7 @@ class LetterCreated(DomainEvent):
     letter_id: UUID = field(default=None)  # type: ignore
     colli_id: UUID = field(default=None)  # type: ignore
     sender_id: UUID = field(default=None)  # type: ignore
-    
+
     def __post_init__(self):
         if self.letter_id is None or self.colli_id is None or self.sender_id is None:
             raise ValueError("letter_id, colli_id and sender_id are required")
@@ -77,7 +77,7 @@ class CommentAdded(DomainEvent):
     comment_id: UUID = field(default=None)  # type: ignore
     letter_id: UUID = field(default=None)  # type: ignore
     author_id: UUID = field(default=None)  # type: ignore
-    
+
     def __post_init__(self):
         if self.comment_id is None or self.letter_id is None or self.author_id is None:
             raise ValueError("comment_id, letter_id and author_id are required")

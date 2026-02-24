@@ -1,19 +1,21 @@
 # src/infrastructure/web/routes/report_routes.py
 """Routes pour les signalements avec documentation OpenAPI."""
 
-from flask import Blueprint, request, jsonify
-from http import HTTPStatus
-from uuid import UUID, uuid4
 from datetime import datetime
 from enum import Enum
-from dependency_injector.wiring import inject, Provide
+from http import HTTPStatus
+from uuid import UUID, uuid4
 
-from src.infrastructure.web.middlewares.auth_middleware import require_auth, require_role, get_current_user_id
-from src.infrastructure.web.middlewares.rate_limiter import limiter
+from flask import Blueprint, jsonify, request
+
+from src.application.exceptions import NotFoundException, ValidationException
 from src.domain.identity.value_objects.user_role import UserRole
-from src.application.exceptions import ValidationException, NotFoundException
-from src.infrastructure.container import Container
-
+from src.infrastructure.web.middlewares.auth_middleware import (
+    get_current_user_id,
+    require_auth,
+    require_role,
+)
+from src.infrastructure.web.middlewares.rate_limiter import limiter
 
 report_bp = Blueprint('reports', __name__, url_prefix='/api/v1/reports')
 
@@ -90,24 +92,24 @@ def create_report():
     """
     user_id = get_current_user_id()
     data = request.get_json() or {}
-    
+
     # Validation
     required = ['target_type', 'target_id', 'reason']
     errors = {}
     for field in required:
         if not data.get(field):
             errors[field] = ["Champ requis"]
-    
+
     if errors:
         raise ValidationException("Donnees invalides", errors=errors)
-    
+
     target_type = data['target_type']
     if target_type not in ['letter', 'comment', 'colli', 'user']:
         raise ValidationException(
             "Type de cible invalide",
             errors={"target_type": ["Valeurs: letter, comment, colli, user"]}
         )
-    
+
     reason = data['reason']
     try:
         ReportType(reason)
@@ -116,7 +118,7 @@ def create_report():
             "Raison invalide",
             errors={"reason": [f"Valeurs: {', '.join(r.value for r in ReportType)}"]}
         )
-    
+
     report_id = uuid4()
     _reports[report_id] = {
         'id': str(report_id),
@@ -130,7 +132,7 @@ def create_report():
         'resolved_at': None,
         'resolved_by': None
     }
-    
+
     return jsonify({
         'id': str(report_id),
         'message': 'Signalement enregistre, merci pour votre vigilance'
@@ -250,16 +252,16 @@ def update_report_status(report_id: UUID):
         $ref: '#/components/responses/NotFound'
     """
     report = _reports.get(report_id)
-    
+
     if not report:
         raise NotFoundException(f"Signalement {report_id} non trouve")
-    
+
     data = request.get_json() or {}
     new_status = data.get('status')
-    
+
     if not new_status:
         raise ValidationException("Le statut est requis", errors={"status": ["Champ requis"]})
-    
+
     try:
         ReportStatus(new_status)
     except ValueError:
@@ -267,15 +269,15 @@ def update_report_status(report_id: UUID):
             "Statut invalide",
             errors={"status": [f"Valeurs: {', '.join(s.value for s in ReportStatus)}"]}
         )
-    
+
     user_id = get_current_user_id()
-    
+
     report['status'] = new_status
     if new_status in ['resolved', 'dismissed']:
         report['resolved_at'] = datetime.utcnow().isoformat()
         report['resolved_by'] = str(user_id)
-    
+
     if data.get('resolution_note'):
         report['resolution_note'] = data['resolution_note']
-    
+
     return jsonify(report), HTTPStatus.OK

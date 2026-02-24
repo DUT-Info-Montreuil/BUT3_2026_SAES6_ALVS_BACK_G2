@@ -1,15 +1,15 @@
 # src/infrastructure/web/routes/export_routes.py
 """Routes pour l'export des donnees RGPD."""
 
-from flask import Blueprint, jsonify, Response
-from http import HTTPStatus
-from datetime import datetime
 import json
-from dependency_injector.wiring import inject, Provide
+from datetime import datetime
+from http import HTTPStatus
 
-from src.infrastructure.web.middlewares.auth_middleware import require_auth, get_current_user_id
+from dependency_injector.wiring import Provide, inject
+from flask import Blueprint, Response, jsonify
+
 from src.infrastructure.container import Container
-
+from src.infrastructure.web.middlewares.auth_middleware import get_current_user_id, require_auth
 
 export_bp = Blueprint('export', __name__, url_prefix='/api/v1/export')
 
@@ -60,36 +60,35 @@ def export_my_data(
       401:
         $ref: '#/components/responses/Unauthorized'
     """
-    from src.application.dtos.user_dto import UserResponseDTO
     from src.application.dtos.colli_dto import ColliResponseDTO
-    from src.application.dtos.letter_dto import LetterResponseDTO
     from src.application.dtos.comment_dto import CommentResponseDTO
-    
+    from src.application.dtos.letter_dto import LetterResponseDTO
+
     user_id = get_current_user_id()
-    
+
     # Recuperer l'utilisateur
     user = user_repo.find_by_id(user_id)
     if not user:
         return jsonify({'error': 'Utilisateur non trouve'}), HTTPStatus.NOT_FOUND
-    
+
     # Recuperer les COLLIs (crees ou membre)
     all_collis = colli_repo.find_all() if hasattr(colli_repo, 'find_all') else []
     my_collis = [
-        c for c in all_collis 
+        c for c in all_collis
         if c.creator_id == user_id or user_id in c.member_ids
     ]
-    
+
     # Recuperer les lettres
     all_letters = letter_repo.find_all() if hasattr(letter_repo, 'find_all') else []
     my_letters = [l for l in all_letters if l.sender_id == user_id]
-    
+
     # Recuperer les commentaires
     all_comments = comment_repo.find_all() if hasattr(comment_repo, 'find_all') else []
     my_comments = [c for c in all_comments if c.author_id == user_id]
-    
+
     # Recuperer les notifications
     my_notifications = notification_repo.find_by_user(user_id, limit=1000)
-    
+
     # Construire l'export
     export_data = {
         'export_date': datetime.utcnow().isoformat(),
@@ -117,7 +116,7 @@ def export_my_data(
             'total_notifications': len(my_notifications)
         }
     }
-    
+
     # Retourner comme fichier telechargeable
     response = Response(
         json.dumps(export_data, indent=2, ensure_ascii=False),
@@ -126,7 +125,7 @@ def export_my_data(
             'Content-Disposition': f'attachment; filename=alvs_export_{user_id}_{datetime.utcnow().strftime("%Y%m%d")}.json'
         }
     )
-    
+
     return response
 
 
@@ -178,28 +177,30 @@ def request_data_deletion(
       401:
         $ref: '#/components/responses/Unauthorized'
     """
-    from flask import request
-    from src.application.exceptions import ValidationException
     from datetime import timedelta
-    
+
+    from flask import request
+
+    from src.application.exceptions import ValidationException
+
     data = request.get_json() or {}
-    
+
     if not data.get('confirm'):
         raise ValidationException(
             "Confirmation requise",
             errors={"confirm": ["Vous devez confirmer la suppression"]}
         )
-    
+
     user_id = get_current_user_id()
     user = user_repo.find_by_id(user_id)
-    
+
     if not user:
         return jsonify({'error': 'Utilisateur non trouve'}), HTTPStatus.NOT_FOUND
-    
+
     # En production: enregistrer la demande dans une table dediee
     # et traiter dans un job background
     deletion_date = datetime.utcnow() + timedelta(days=30)
-    
+
     return jsonify({
         'message': 'Votre demande de suppression a ete enregistree',
         'deletion_date': deletion_date.isoformat(),

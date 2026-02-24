@@ -1,34 +1,30 @@
 # src/infrastructure/web/routes/colli_routes.py
 """Routes pour les COLLIs avec documentation OpenAPI."""
 
-from flask import Blueprint, request, jsonify
 from http import HTTPStatus
 from uuid import UUID
-from marshmallow import ValidationError
-from dependency_injector.wiring import inject, Provide
-from flask_jwt_extended import jwt_required, get_jwt_identity
 
+from dependency_injector.wiring import Provide, inject
+from flask import Blueprint, jsonify, request
+from flask_jwt_extended import get_jwt_identity, jwt_required
+from marshmallow import ValidationError
+
+from src.application.exceptions import ValidationException
+from src.application.use_cases.colli.approve_colli import ApproveColliCommand, ApproveColliUseCase
+from src.application.use_cases.colli.create_colli import CreateColliCommand, CreateColliUseCase
+from src.application.use_cases.colli.delete_colli import DeleteColliUseCase
+from src.application.use_cases.colli.get_colli import GetColliByIdUseCase, ListCollisUseCase
+from src.application.use_cases.colli.membership import JoinColliUseCase, LeaveColliUseCase
+from src.domain.identity.value_objects.user_role import UserRole
+from src.infrastructure.container import Container
+from src.infrastructure.web.middlewares.auth_middleware import (
+    require_role,
+)
 from src.infrastructure.web.schemas.colli_schema import (
+    ColliListQuerySchema,
     CreateColliSchema,
     UpdateColliSchema,
-    RejectColliSchema,
-    AddMemberSchema,
-    ColliListQuerySchema
 )
-from src.infrastructure.web.middlewares.auth_middleware import (
-    require_auth,
-    require_role,
-    get_current_user_id
-)
-from src.domain.identity.value_objects.user_role import UserRole
-from src.application.exceptions import ValidationException
-from src.application.use_cases.colli.create_colli import CreateColliUseCase, CreateColliCommand
-from src.application.use_cases.colli.approve_colli import ApproveColliUseCase, ApproveColliCommand
-from src.application.use_cases.colli.get_colli import GetColliByIdUseCase, ListCollisUseCase
-from src.application.use_cases.colli.delete_colli import DeleteColliUseCase
-from src.application.use_cases.colli.membership import JoinColliUseCase, LeaveColliUseCase
-from src.infrastructure.container import Container
-
 
 # Utiliser un nom unique pour éviter les conflits de blueprint
 colli_bp = Blueprint('colli_routes_v1', __name__, url_prefix='/api/v1/collis')
@@ -85,16 +81,16 @@ def create_colli(
         data = schema.load(request.get_json() or {})
     except ValidationError as err:
         raise ValidationException("Données invalides", errors=err.messages)
-    
+
     creator_id = get_jwt_identity()
-    
+
     result = use_case.execute(CreateColliCommand(
         name=data['name'],
         theme=data['theme'],
         description=data.get('description'),
         creator_id=creator_id
     ))
-    
+
     return jsonify(result.to_dict()), HTTPStatus.CREATED
 
 
@@ -150,10 +146,10 @@ def list_collis(
         params = schema.load(request.args)
     except ValidationError as err:
         raise ValidationException("Paramètres invalides", errors=err.messages)
-    
+
     page = params.get('page', 1)
     per_page = params.get('per_page', 20)
-    
+
     result = use_case.execute(page, per_page)
     return jsonify(result), HTTPStatus.OK
 
@@ -272,12 +268,12 @@ def approve_colli(
         $ref: '#/components/responses/NotFound'
     """
     approver_id = get_jwt_identity()
-    
+
     result = use_case.execute(ApproveColliCommand(
         colli_id=colli_id,
         approver_id=approver_id
     ))
-    
+
     return jsonify(result.to_dict()), HTTPStatus.OK
 
 
@@ -448,17 +444,17 @@ def get_my_collis(
         $ref: '#/components/responses/Unauthorized'
     """
     from src.application.use_cases.colli.get_user_collis import ColliRoleFilter
-    
+
     user_id = get_jwt_identity()
     role_str = request.args.get('role', 'all')
     page = request.args.get('page', 1, type=int)
     per_page = min(request.args.get('per_page', 20, type=int), 100)
-    
+
     try:
         role_filter = ColliRoleFilter(role_str)
     except ValueError:
         role_filter = ColliRoleFilter.ALL
-    
+
     result = use_case.execute(user_id, role_filter, page, per_page)
     return jsonify(result), HTTPStatus.OK
 
@@ -513,15 +509,15 @@ def update_colli(
         $ref: '#/components/responses/NotFound'
     """
     from src.application.use_cases.colli.update_colli import UpdateColliCommand
-    
+
     schema = UpdateColliSchema()
     try:
         data = schema.load(request.get_json() or {})
     except ValidationError as err:
         raise ValidationException("Donnees invalides", errors=err.messages)
-    
+
     user_id = get_jwt_identity()
-    
+
     result = use_case.execute(UpdateColliCommand(
         colli_id=colli_id,
         user_id=user_id,
@@ -529,7 +525,7 @@ def update_colli(
         theme=data.get('theme'),
         description=data.get('description')
     ))
-    
+
     return jsonify(result.to_dict()), HTTPStatus.OK
 
 
@@ -580,14 +576,14 @@ def reject_colli(
         $ref: '#/components/responses/NotFound'
     """
     from src.application.use_cases.colli.reject_colli import RejectColliCommand
-    
+
     data = request.get_json() or {}
     admin_id = get_jwt_identity()
-    
+
     result = use_case.execute(RejectColliCommand(
         colli_id=colli_id,
         admin_id=admin_id,
         reason=data.get('reason')
     ))
-    
+
     return jsonify(result.to_dict()), HTTPStatus.OK

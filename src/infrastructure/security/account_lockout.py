@@ -1,19 +1,20 @@
 # src/infrastructure/security/account_lockout.py
 """Gestion du verrouillage des comptes après échecs de connexion."""
 
-from typing import Optional
-import redis
 import os
+from typing import Optional
+
+import redis
 
 
 class AccountLockoutService:
     """
     Service de verrouillage de compte.
-    
+
     Bloque un compte après un nombre défini d'échecs de connexion.
     Utilise Redis pour stocker les compteurs d'échecs.
     """
-    
+
     def __init__(
         self,
         redis_client: Optional[redis.Redis] = None,
@@ -23,32 +24,32 @@ class AccountLockoutService:
         self._redis = redis_client
         self._threshold = threshold
         self._lockout_duration = lockout_duration
-        
+
         # Fallback en mémoire si Redis n'est pas disponible
         self._memory_store: dict = {}
-    
+
     def _get_key(self, email: str) -> str:
         return f"lockout:{email.lower()}"
-    
+
     def is_locked(self, email: str) -> bool:
         """Vérifie si un compte est verrouillé."""
         key = self._get_key(email)
-        
+
         if self._redis:
             attempts = self._redis.get(key)
             return int(attempts or 0) >= self._threshold
         else:
             return self._memory_store.get(key, 0) >= self._threshold
-    
+
     def increment_failure(self, email: str) -> int:
         """
         Incrémente le compteur d'échecs.
-        
+
         Returns:
             int: Nombre d'échecs actuel
         """
         key = self._get_key(email)
-        
+
         if self._redis:
             pipe = self._redis.pipeline()
             pipe.incr(key)
@@ -59,25 +60,25 @@ class AccountLockoutService:
             current = self._memory_store.get(key, 0) + 1
             self._memory_store[key] = current
             return current
-    
+
     def clear_lockout(self, email: str) -> None:
         """Réinitialise le compteur d'échecs après une connexion réussie."""
         key = self._get_key(email)
-        
+
         if self._redis:
             self._redis.delete(key)
         else:
             self._memory_store.pop(key, None)
-    
+
     def get_remaining_attempts(self, email: str) -> int:
         """Retourne le nombre de tentatives restantes."""
         key = self._get_key(email)
-        
+
         if self._redis:
             attempts = int(self._redis.get(key) or 0)
         else:
             attempts = self._memory_store.get(key, 0)
-        
+
         return max(0, self._threshold - attempts)
 
 

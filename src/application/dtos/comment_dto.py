@@ -1,7 +1,7 @@
 # src/application/dtos/comment_dto.py
 """DTOs pour les Comments."""
 
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from uuid import UUID
 
 from src.domain.collaboration.entities.comment import Comment
@@ -32,7 +32,7 @@ class CommentResponseDTO:
     sender_id: str
     created_at: str
     updated_at: str
-    
+
     @classmethod
     def from_entity(cls, comment: Comment) -> "CommentResponseDTO":
         """Construit le DTO depuis une entité."""
@@ -44,7 +44,7 @@ class CommentResponseDTO:
             created_at=comment.created_at.isoformat(),
             updated_at=comment.updated_at.isoformat()
         )
-    
+
     def to_dict(self) -> dict:
         """Convertit en dictionnaire."""
         return asdict(self)
@@ -58,7 +58,7 @@ class CommentListResponseDTO:
     page: int
     per_page: int
     has_more: bool
-    
+
     def to_dict(self) -> dict:
         """Convertit en dictionnaire."""
         return {

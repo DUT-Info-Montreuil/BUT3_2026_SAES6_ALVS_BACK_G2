@@ -1,7 +1,7 @@
 # src/application/dtos/letter_dto.py
 """DTOs pour les Letters."""
 
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from typing import Optional
 from uuid import UUID
 
@@ -47,7 +47,7 @@ class LetterResponseDTO:
     created_at: str
     updated_at: str
     comment_count: int = 0
-    
+
     @classmethod
     def from_entity(cls, letter: Letter, comment_count: int = 0) -> "LetterResponseDTO":
         """Construit le DTO depuis une entité."""
@@ -63,7 +63,7 @@ class LetterResponseDTO:
             updated_at=letter.updated_at.isoformat(),
             comment_count=comment_count
         )
-    
+
     def to_dict(self) -> dict:
         """Convertit en dictionnaire."""
         return asdict(self)
@@ -77,7 +77,7 @@ class LetterListResponseDTO:
     page: int
     per_page: int
     has_more: bool
-    
+
     def to_dict(self) -> dict:
         """Convertit en dictionnaire."""
         return {

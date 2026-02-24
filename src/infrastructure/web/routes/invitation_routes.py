@@ -2,18 +2,20 @@
 """Routes pour les invitations COLLI avec documentation OpenAPI."""
 
 import secrets
-from flask import Blueprint, request, jsonify
+from datetime import datetime, timedelta
 from http import HTTPStatus
 from uuid import UUID
-from datetime import datetime, timedelta
-from dependency_injector.wiring import inject, Provide
 
-from src.infrastructure.web.middlewares.auth_middleware import require_auth, require_role, get_current_user_id
-from src.infrastructure.web.middlewares.rate_limiter import limiter
-from src.domain.identity.value_objects.user_role import UserRole
-from src.application.exceptions import ValidationException, NotFoundException, ForbiddenException
+from dependency_injector.wiring import Provide, inject
+from flask import Blueprint, jsonify, request
+
+from src.application.exceptions import ForbiddenException, NotFoundException, ValidationException
 from src.infrastructure.container import Container
-
+from src.infrastructure.web.middlewares.auth_middleware import (
+    get_current_user_id,
+    require_auth,
+)
+from src.infrastructure.web.middlewares.rate_limiter import limiter
 
 invitation_bp = Blueprint('invitations', __name__, url_prefix='/api/v1')
 
@@ -87,21 +89,21 @@ def create_invitation(
     """
     user_id = get_current_user_id()
     colli = colli_repo.find_by_id(colli_id)
-    
+
     if not colli:
         raise NotFoundException(f"COLLI {colli_id} non trouve")
-    
+
     # Verifier que l'utilisateur est createur ou membre
     if colli.creator_id != user_id and user_id not in colli.member_ids:
         raise ForbiddenException("Vous n'etes pas membre de ce COLLI")
-    
+
     data = request.get_json() or {}
     expires_in_hours = data.get('expires_in_hours', 72)
     target_email = data.get('email')
-    
+
     code = _generate_invite_code()
     expires_at = datetime.utcnow() + timedelta(hours=expires_in_hours)
-    
+
     _invitations[code] = {
         'colli_id': str(colli_id),
         'created_by': str(user_id),
@@ -109,7 +111,7 @@ def create_invitation(
         'expires_at': expires_at,
         'used': False
     }
-    
+
     return jsonify({
         'code': code,
         'invite_url': f"/api/v1/invitations/{code}/accept",
@@ -152,15 +154,15 @@ def get_invitation(code: str):
         $ref: '#/components/responses/NotFound'
     """
     invitation = _invitations.get(code)
-    
+
     if not invitation:
         raise NotFoundException("Invitation non trouvee ou expiree")
-    
+
     is_valid = (
-        not invitation['used'] and 
+        not invitation['used'] and
         invitation['expires_at'] > datetime.utcnow()
     )
-    
+
     return jsonify({
         'colli_id': invitation['colli_id'],
         'expires_at': invitation['expires_at'].isoformat(),
@@ -207,37 +209,37 @@ def accept_invitation(
         $ref: '#/components/responses/NotFound'
     """
     invitation = _invitations.get(code)
-    
+
     if not invitation:
         raise NotFoundException("Invitation non trouvee")
-    
+
     if invitation['used']:
         raise ValidationException("Cette invitation a deja ete utilisee")
-    
+
     if invitation['expires_at'] < datetime.utcnow():
         raise ValidationException("Cette invitation a expire")
-    
+
     user_id = get_current_user_id()
     colli_id = UUID(invitation['colli_id'])
-    
+
     colli = colli_repo.find_by_id(colli_id)
     if not colli:
-        raise NotFoundException(f"COLLI non trouve")
-    
+        raise NotFoundException("COLLI non trouve")
+
     # Verifier si deja membre
     if user_id in colli.member_ids or user_id == colli.creator_id:
         return jsonify({
             'message': 'Vous etes deja membre de ce COLLI',
             'colli_id': str(colli_id)
         }), HTTPStatus.OK
-    
+
     # Ajouter comme membre
     colli.add_member(user_id)
     colli_repo.save(colli)
-    
+
     # Marquer l'invitation comme utilisee
     invitation['used'] = True
-    
+
     return jsonify({
         'message': 'Vous avez rejoint le COLLI avec succes',
         'colli_id': str(colli_id)

@@ -1,13 +1,10 @@
 # src/application/dtos/colli_dto.py
 """Data Transfer Objects pour les Collis."""
 
-from dataclasses import dataclass, asdict
-from datetime import datetime
-from typing import Optional, List
-from uuid import UUID
+from dataclasses import asdict, dataclass
+from typing import List, Optional
 
 from src.domain.collaboration.entities.colli import Colli
-from src.domain.collaboration.value_objects.colli_status import ColliStatus
 
 
 @dataclass
@@ -30,7 +27,7 @@ class ColliResponseDTO:
     member_count: int
     created_at: str
     updated_at: str
-    
+
     @classmethod
     def from_entity(cls, colli: Colli) -> "ColliResponseDTO":
         """Construit le DTO depuis une entité du domaine."""
@@ -45,7 +42,7 @@ class ColliResponseDTO:
             created_at=colli.created_at.isoformat(),
             updated_at=colli.updated_at.isoformat()
         )
-    
+
     def to_dict(self) -> dict:
         """Convertit le DTO en dictionnaire."""
         return asdict(self)
@@ -59,7 +56,7 @@ class ColliListResponseDTO:
     page: int
     per_page: int
     pages: int
-    
+
     def to_dict(self) -> dict:
         """Convertit le DTO en dictionnaire."""
         return {

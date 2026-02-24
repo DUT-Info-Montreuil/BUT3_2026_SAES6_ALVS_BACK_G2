@@ -25,7 +25,7 @@ class NotificationType(Enum):
 class Notification:
     """
     Notification pour un utilisateur.
-    
+
     Attributes:
         id: Identifiant unique
         user_id: Utilisateur destinataire
@@ -48,18 +48,18 @@ class Notification:
     read_at: Optional[datetime] = None
     id: UUID = field(default_factory=uuid4)
     created_at: datetime = field(default_factory=datetime.utcnow)
-    
+
     # Alias pour compatibilite
     @property
     def notification_type(self) -> NotificationType:
         """Alias pour le type de notification."""
         return self.type
-    
+
     def mark_as_read(self) -> None:
         """Marque la notification comme lue."""
         self.read = True
         self.read_at = datetime.utcnow()
-    
+
     def to_dict(self) -> dict:
         """Convertit en dictionnaire."""
         return {

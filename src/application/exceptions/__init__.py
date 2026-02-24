@@ -8,7 +8,7 @@ Ces exceptions sont mappées vers des codes HTTP dans la couche infrastructure.
 
 class ApplicationException(Exception):
     """Exception de base pour la couche application."""
-    
+
     def __init__(self, message: str, details: dict = None):
         self.message = message
         self.details = details or {}
@@ -42,7 +42,7 @@ class ConflictException(ApplicationException):
 
 class ValidationException(ApplicationException):
     """Erreur de validation des données d'entrée (HTTP 400)."""
-    
+
     def __init__(self, message: str, errors: dict = None):
         super().__init__(message, details={"errors": errors or {}})
         self.errors = errors or {}

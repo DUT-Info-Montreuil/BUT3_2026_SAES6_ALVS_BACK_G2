@@ -1,6 +1,7 @@
 # src/application/use_cases/user/reset_password.py
 """Use Case: Reinitialisation du mot de passe avec token."""
 
+import re
 from dataclasses import dataclass
 from uuid import UUID
 
@@ -59,7 +60,25 @@ class ResetPasswordUseCase:
                 "Mot de passe trop court",
                 errors={"new_password": ["Minimum 8 caracteres"]}
             )
-        
+
+        if not re.search(r'[A-Z]', command.new_password):
+            raise ValidationException(
+                "Mot de passe trop faible",
+                errors={"new_password": ["Le mot de passe doit contenir au moins une majuscule"]}
+            )
+
+        if not re.search(r'[0-9]', command.new_password):
+            raise ValidationException(
+                "Mot de passe trop faible",
+                errors={"new_password": ["Le mot de passe doit contenir au moins un chiffre"]}
+            )
+
+        if not re.search(r'[!@#$%^&*(),.?":{}|<>]', command.new_password):
+            raise ValidationException(
+                "Mot de passe trop faible",
+                errors={"new_password": ["Le mot de passe doit contenir au moins un caractere special"]}
+            )
+
         # Recuperer les donnees du token
         token_data = get_reset_token_data(command.token)
         if not token_data:

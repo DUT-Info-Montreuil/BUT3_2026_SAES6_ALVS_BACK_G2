@@ -271,12 +271,35 @@ def approve_colli(
         $ref: '#/components/responses/NotFound'
     """
     approver_id = get_current_user_id()
-    
+
     result = use_case.execute(ApproveColliCommand(
         colli_id=colli_id,
         approver_id=approver_id
     ))
-    
+
+    # Notifications et WebSocket
+    try:
+        from src.infrastructure.services.notification_service import get_notification_service
+        from src.infrastructure.websocket.socket_manager import notify_colli_status_change
+        from src.infrastructure.security.audit_logger import log_audit_event, AuditEvent
+
+        colli_name = result.name if hasattr(result, 'name') else str(colli_id)
+        creator_id = result.creator_id if hasattr(result, 'creator_id') else None
+
+        if creator_id:
+            get_notification_service().notify_colli_approved(
+                colli_id=colli_id,
+                colli_name=colli_name,
+                creator_id=creator_id
+            )
+
+        notify_colli_status_change(str(colli_id), 'active', colli_name)
+        log_audit_event(AuditEvent.COLLI_APPROVED, str(approver_id), details={
+            "colli_id": str(colli_id), "colli_name": colli_name
+        })
+    except Exception:
+        pass  # Ne pas bloquer l'approbation si les notifications echouent
+
     return jsonify(result.to_dict()), HTTPStatus.OK
 
 
@@ -666,14 +689,39 @@ def reject_colli(
         $ref: '#/components/responses/NotFound'
     """
     from src.application.use_cases.colli.reject_colli import RejectColliCommand
-    
+
     data = request.get_json() or {}
     admin_id = get_current_user_id()
-    
+    reason = data.get('reason')
+
     result = use_case.execute(RejectColliCommand(
         colli_id=colli_id,
         admin_id=admin_id,
-        reason=data.get('reason')
+        reason=reason
     ))
-    
+
+    # Notifications et WebSocket
+    try:
+        from src.infrastructure.services.notification_service import get_notification_service
+        from src.infrastructure.websocket.socket_manager import notify_colli_status_change
+        from src.infrastructure.security.audit_logger import log_audit_event, AuditEvent
+
+        colli_name = result.name if hasattr(result, 'name') else str(colli_id)
+        creator_id = result.creator_id if hasattr(result, 'creator_id') else None
+
+        if creator_id:
+            get_notification_service().notify_colli_rejected(
+                colli_id=colli_id,
+                colli_name=colli_name,
+                creator_id=creator_id,
+                reason=reason
+            )
+
+        notify_colli_status_change(str(colli_id), 'rejected', colli_name)
+        log_audit_event(AuditEvent.COLLI_REJECTED, str(admin_id), details={
+            "colli_id": str(colli_id), "colli_name": colli_name, "reason": reason
+        })
+    except Exception:
+        pass  # Ne pas bloquer le rejet si les notifications echouent
+
     return jsonify(result.to_dict()), HTTPStatus.OK

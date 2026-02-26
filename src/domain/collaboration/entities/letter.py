@@ -43,6 +43,7 @@ class Letter:
     content: Optional[str] = None
     file_url: Optional[str] = None
     file_name: Optional[str] = None
+    title: Optional[str] = None
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
     
@@ -54,16 +55,18 @@ class Letter:
         cls,
         colli_id: UUID,
         sender_id: UUID,
-        content: str
+        content: str,
+        title: Optional[str] = None
     ) -> "Letter":
         """
         Factory pour créer une lettre texte.
-        
+
         Args:
             colli_id: ID du COLLI parent.
             sender_id: ID de l'utilisateur qui envoie.
             content: Contenu texte de la lettre.
-            
+            title: Titre optionnel de la lettre.
+
         Returns:
             Letter: Nouvelle lettre texte.
         """
@@ -71,13 +74,14 @@ class Letter:
             raise LetterValidationException(
                 "Le contenu doit faire au moins 10 caractères"
             )
-        
+
         return cls(
             id=uuid4(),
             letter_type=LetterType.TEXT,
             colli_id=colli_id,
             sender_id=sender_id,
-            content=content.strip()
+            content=content.strip(),
+            title=title.strip() if title else None
         )
     
     @classmethod
@@ -87,24 +91,26 @@ class Letter:
         sender_id: UUID,
         file_url: str,
         file_name: str,
-        description: Optional[str] = None
+        description: Optional[str] = None,
+        title: Optional[str] = None
     ) -> "Letter":
         """
         Factory pour créer une lettre avec fichier PDF.
-        
+
         Args:
             colli_id: ID du COLLI parent.
             sender_id: ID de l'utilisateur qui envoie.
             file_url: URL du fichier uploadé.
             file_name: Nom original du fichier.
             description: Description optionnelle.
-            
+            title: Titre optionnel de la lettre.
+
         Returns:
             Letter: Nouvelle lettre fichier.
         """
         if not file_url:
             raise LetterValidationException("L'URL du fichier est obligatoire")
-        
+
         return cls(
             id=uuid4(),
             letter_type=LetterType.FILE,
@@ -112,7 +118,8 @@ class Letter:
             sender_id=sender_id,
             file_url=file_url,
             file_name=file_name,
-            content=description
+            content=description,
+            title=title.strip() if title else None
         )
     
     def update_content(self, new_content: str, editor_id: UUID) -> None:

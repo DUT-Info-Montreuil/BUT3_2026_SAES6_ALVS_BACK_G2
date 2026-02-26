@@ -57,7 +57,8 @@ class CreateTextLetterUseCase:
             letter = Letter.create_text_letter(
                 colli_id=command.colli_id,
                 sender_id=command.sender_id,
-                content=command.content
+                content=command.content,
+                title=command.title
             )
         except Exception as e:
             raise ValidationException(str(e))
@@ -108,7 +109,8 @@ class CreateFileLetterUseCase:
                 sender_id=command.sender_id,
                 file_url=command.file_url,
                 file_name=command.file_name,
-                description=command.description
+                description=command.description,
+                title=command.title
             )
         except Exception as e:
             raise ValidationException(str(e))

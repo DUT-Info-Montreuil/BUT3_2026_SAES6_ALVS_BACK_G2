@@ -17,6 +17,7 @@ class LetterModel(Base):
     
     id = Column(Uuid, primary_key=True, default=uuid.uuid4)
     letter_type = Column(String(20), nullable=False, default='text')
+    title = Column(String(255), nullable=True)
     content = Column(Text, nullable=True)
     file_url = Column(String(255), nullable=True)
     file_name = Column(String(255), nullable=True)

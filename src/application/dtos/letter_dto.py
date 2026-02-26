@@ -14,6 +14,7 @@ class CreateTextLetterCommand:
     colli_id: UUID
     sender_id: UUID
     content: str
+    title: Optional[str] = None
 
 
 @dataclass
@@ -24,6 +25,7 @@ class CreateFileLetterCommand:
     file_url: str
     file_name: str
     description: Optional[str] = None
+    title: Optional[str] = None
 
 
 @dataclass
@@ -42,12 +44,13 @@ class LetterResponseDTO:
     content: Optional[str]
     file_url: Optional[str]
     file_name: Optional[str]
+    title: Optional[str]
     colli_id: str
     sender_id: str
     created_at: str
     updated_at: str
     comment_count: int = 0
-    
+
     @classmethod
     def from_entity(cls, letter: Letter, comment_count: int = 0) -> "LetterResponseDTO":
         """Construit le DTO depuis une entité."""
@@ -57,6 +60,7 @@ class LetterResponseDTO:
             content=letter.content,
             file_url=letter.file_url,
             file_name=letter.file_name,
+            title=letter.title,
             colli_id=str(letter.colli_id),
             sender_id=str(letter.sender_id),
             created_at=letter.created_at.isoformat(),

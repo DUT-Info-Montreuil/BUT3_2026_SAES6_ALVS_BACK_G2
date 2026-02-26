@@ -43,7 +43,7 @@ class FileStorageService:
     Peut etre etendu pour supporter S3, MinIO, etc.
     """
     
-    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf', 'mp3', 'wav', 'm4a', 'doc', 'docx', 'txt'}
+    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'pdf', 'mp3', 'wav', 'm4a', 'doc', 'docx', 'txt'}
     MAX_SIZE = 16 * 1024 * 1024  # 16 MB
     
     def __init__(self, upload_folder: Optional[str] = None):
@@ -81,6 +81,7 @@ class FileStorageService:
             'jpg': 'image/jpeg',
             'jpeg': 'image/jpeg',
             'gif': 'image/gif',
+            'webp': 'image/webp',
             'pdf': 'application/pdf',
             'mp3': 'audio/mpeg',
             'wav': 'audio/wav',

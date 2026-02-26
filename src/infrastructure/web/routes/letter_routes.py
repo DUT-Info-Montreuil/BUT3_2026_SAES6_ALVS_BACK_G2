@@ -86,22 +86,24 @@ def create_letter(
     if letter_type == 'text':
         if not data.get('content'):
             raise ValidationException("Le contenu est obligatoire pour une lettre texte")
-        
+
         result = use_case_text.execute(CreateTextLetterCommand(
             colli_id=colli_id,
             sender_id=sender_id,
-            content=data['content']
+            content=data['content'],
+            title=data.get('title')
         ))
     elif letter_type == 'file':
         if not data.get('file_url') or not data.get('file_name'):
             raise ValidationException("file_url et file_name sont obligatoires")
-        
+
         result = use_case_file.execute(CreateFileLetterCommand(
             colli_id=colli_id,
             sender_id=sender_id,
             file_url=data['file_url'],
             file_name=data['file_name'],
-            description=data.get('description')
+            description=data.get('description'),
+            title=data.get('title')
         ))
     else:
         raise ValidationException(f"Type de lettre invalide: {letter_type}")

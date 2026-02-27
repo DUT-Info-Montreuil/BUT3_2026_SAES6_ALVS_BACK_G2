@@ -363,7 +363,6 @@ def create_user(
         description: Email deja utilise
     """
     from src.domain.identity.entities.user import User
-    from src.domain.identity.value_objects.hashed_password import HashedPassword
     from src.application.dtos.user_dto import UserResponseDTO
     
     data = request.get_json() or {}
@@ -385,23 +384,23 @@ def create_user(
         )
     
     # Verifier email unique
-    if user_repo.find_by_email(data['email']):
+    if user_repo.find_by_email_str(data['email']):
         raise ValidationException(
             "Email deja utilise",
             errors={"email": ["Un compte existe deja avec cet email"]}
         )
-    
+
     # Determiner le role
     role_str = data.get('role', 'member')
     try:
         role = UserRole(role_str)
     except ValueError:
         role = UserRole.MEMBER
-    
+
     # Creer l'utilisateur
-    user = User(
+    user = User.create(
         email=data['email'],
-        password=HashedPassword.create(data['password']),
+        password=data['password'],
         first_name=data['first_name'],
         last_name=data['last_name'],
         role=role
@@ -413,6 +412,51 @@ def create_user(
 
 
 @admin_bp.delete('/users/<uuid:user_id>')
+@require_role([UserRole.ADMIN])
+@inject
+def delete_user(
+    user_id: UUID,
+    user_repo = Provide[Container.user_repository]
+):
+    """
+    Supprimer un utilisateur
+    ---
+    tags:
+      - Admin
+    summary: Supprimer definitivement un utilisateur (admin uniquement)
+    security:
+      - BearerAuth: []
+    parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      204:
+        description: Utilisateur supprime
+      401:
+        $ref: '#/components/responses/Unauthorized'
+      403:
+        $ref: '#/components/responses/Forbidden'
+      404:
+        $ref: '#/components/responses/NotFound'
+    """
+    user = user_repo.find_by_id(user_id)
+    if not user:
+        raise NotFoundException(f"Utilisateur {user_id} non trouve")
+
+    current_user_id = get_current_user_id()
+    if user_id == current_user_id:
+        raise ValidationException("Vous ne pouvez pas supprimer votre propre compte")
+
+    user_repo.delete(user)
+
+    return '', HTTPStatus.NO_CONTENT
+
+
+@admin_bp.patch('/users/<uuid:user_id>/ban')
 @require_role([UserRole.ADMIN])
 @inject
 def ban_user(
@@ -452,7 +496,6 @@ def ban_user(
     if not user:
         raise NotFoundException(f"Utilisateur {user_id} non trouve")
 
-    # Empecher de se bannir soi-meme
     current_user_id = get_current_user_id()
     if user_id == current_user_id:
         raise ValidationException("Vous ne pouvez pas bannir votre propre compte")

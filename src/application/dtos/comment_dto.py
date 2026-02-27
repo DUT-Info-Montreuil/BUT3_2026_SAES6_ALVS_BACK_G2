@@ -15,6 +15,7 @@ class CreateCommentCommand:
     sender_id: UUID
     content: str
     parent_comment_id: Optional[UUID] = None
+    attachment_url: Optional[str] = None
 
 
 @dataclass
@@ -32,23 +33,27 @@ class CommentResponseDTO:
     content: str
     letter_id: str
     sender_id: str
+    sender_name: Optional[str]
     parent_comment_id: Optional[str]
+    attachment_url: Optional[str]
     created_at: str
     updated_at: str
 
     @classmethod
-    def from_entity(cls, comment: Comment) -> "CommentResponseDTO":
+    def from_entity(cls, comment: Comment, sender_name: Optional[str] = None) -> "CommentResponseDTO":
         """Construit le DTO depuis une entité."""
         return cls(
             id=str(comment.id),
             content=comment.content,
             letter_id=str(comment.letter_id),
             sender_id=str(comment.sender_id),
+            sender_name=sender_name,
             parent_comment_id=str(comment.parent_comment_id) if comment.parent_comment_id else None,
+            attachment_url=comment.attachment_url,
             created_at=comment.created_at.isoformat(),
             updated_at=comment.updated_at.isoformat()
         )
-    
+
     def to_dict(self) -> dict:
         """Convertit en dictionnaire."""
         return asdict(self)

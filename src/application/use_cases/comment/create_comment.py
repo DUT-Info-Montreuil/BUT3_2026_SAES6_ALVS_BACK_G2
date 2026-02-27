@@ -57,7 +57,8 @@ class CreateCommentUseCase:
                 letter_id=command.letter_id,
                 sender_id=command.sender_id,
                 content=command.content,
-                parent_comment_id=command.parent_comment_id
+                parent_comment_id=command.parent_comment_id,
+                attachment_url=command.attachment_url
             )
         except Exception as e:
             raise ValidationException(str(e))

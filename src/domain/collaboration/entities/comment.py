@@ -37,6 +37,7 @@ class Comment:
     sender_id: UUID
     content: str
     parent_comment_id: Optional[UUID] = None
+    attachment_url: Optional[str] = None
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
     
@@ -46,7 +47,8 @@ class Comment:
         letter_id: UUID,
         sender_id: UUID,
         content: str,
-        parent_comment_id: Optional[UUID] = None
+        parent_comment_id: Optional[UUID] = None,
+        attachment_url: Optional[str] = None
     ) -> "Comment":
         """
         Factory pour créer un commentaire.
@@ -56,6 +58,7 @@ class Comment:
             sender_id: ID de l'utilisateur qui commente.
             content: Contenu du commentaire.
             parent_comment_id: ID du commentaire parent (pour le threading).
+            attachment_url: URL optionnelle d'un fichier joint.
 
         Returns:
             Comment: Nouveau commentaire.
@@ -75,7 +78,8 @@ class Comment:
             letter_id=letter_id,
             sender_id=sender_id,
             content=content.strip(),
-            parent_comment_id=parent_comment_id
+            parent_comment_id=parent_comment_id,
+            attachment_url=attachment_url
         )
     
     def update_content(self, new_content: str, editor_id: UUID) -> None:

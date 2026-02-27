@@ -38,9 +38,12 @@ class InMemoryColliRepository(IColliRepository):
         end = start + per_page
         return all_collis[start:end]
     
-    def find_by_status(self, status: ColliStatus) -> List[Colli]:
-        """Récupère les Collis par statut."""
-        return [c for c in self._store.values() if c.status == status]
+    def find_by_status(self, status: ColliStatus, page: int = 1, per_page: int = 20) -> List[Colli]:
+        """Récupère les Collis par statut avec pagination."""
+        filtered = [c for c in self._store.values() if c.status == status]
+        start = (page - 1) * per_page
+        end = start + per_page
+        return filtered[start:end]
     
     def find_by_creator(self, creator_id: UUID) -> List[Colli]:
         """Récupère les Collis d'un créateur."""

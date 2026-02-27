@@ -25,7 +25,8 @@ comment_bp = Blueprint('comments', __name__, url_prefix='/api/v1/letters/<uuid:l
 @inject
 def create_comment(
     letter_id: UUID,
-    use_case: CreateCommentUseCase = Provide[Container.create_comment_use_case]
+    use_case: CreateCommentUseCase = Provide[Container.create_comment_use_case],
+    user_repo = Provide[Container.user_repository]
 ):
     """
     Créer un commentaire
@@ -53,6 +54,9 @@ def create_comment(
               content:
                 type: string
                 example: "Très belle analyse !"
+              attachment_url:
+                type: string
+                description: URL d'un fichier joint (uploade via /files/upload)
     responses:
       201:
         description: Commentaire créé
@@ -69,7 +73,7 @@ def create_comment(
     """
     data = request.get_json() or {}
     sender_id = get_current_user_id()
-    
+
     if not data.get('content'):
         raise ValidationException("Le contenu est obligatoire")
 
@@ -80,13 +84,21 @@ def create_comment(
         except ValueError:
             raise ValidationException("parent_comment_id invalide")
 
+    attachment_url = data.get('attachment_url')
+
     result = use_case.execute(CreateCommentCommand(
         letter_id=letter_id,
         sender_id=sender_id,
         content=data['content'],
-        parent_comment_id=parent_comment_id
+        parent_comment_id=parent_comment_id,
+        attachment_url=attachment_url
     ))
-    
+
+    # Enrichir avec le nom de l'auteur
+    user = user_repo.find_by_id(sender_id)
+    if user:
+        result.sender_name = f"{user.first_name} {user.last_name}"
+
     return jsonify(result.to_dict()), HTTPStatus.CREATED
 
 
@@ -95,7 +107,8 @@ def create_comment(
 @inject
 def list_comments(
     letter_id: UUID,
-    use_case: GetCommentsForLetterUseCase = Provide[Container.get_comments_use_case]
+    use_case: GetCommentsForLetterUseCase = Provide[Container.get_comments_use_case],
+    user_repo = Provide[Container.user_repository]
 ):
     """
     Lister les commentaires
@@ -145,8 +158,23 @@ def list_comments(
     user_id = get_current_user_id()
     page = request.args.get('page', 1, type=int)
     per_page = min(request.args.get('per_page', 50, type=int), 100)
-    
+
     result = use_case.execute(letter_id, user_id, page, per_page)
+
+    # Enrichir chaque commentaire avec le nom du sender
+    sender_ids = {item.sender_id for item in result.items}
+    sender_names = {}
+    for sid in sender_ids:
+        try:
+            user = user_repo.find_by_id(UUID(sid))
+            if user:
+                sender_names[sid] = f"{user.first_name} {user.last_name}"
+        except (ValueError, Exception):
+            pass
+
+    for item in result.items:
+        item.sender_name = sender_names.get(item.sender_id)
+
     return jsonify(result.to_dict()), HTTPStatus.OK
 
 
@@ -251,19 +279,19 @@ def update_comment(
     """
     from src.application.use_cases.comment.update_comment import UpdateCommentCommand
     from src.application.exceptions import ValidationException
-    
+
     data = request.get_json() or {}
     content = data.get('content')
-    
+
     if not content:
         raise ValidationException("Le contenu est requis", errors={"content": ["Champ requis"]})
-    
+
     user_id = get_current_user_id()
-    
+
     result = use_case.execute(UpdateCommentCommand(
         comment_id=comment_id,
         user_id=user_id,
         content=content
     ))
-    
+
     return jsonify(result.to_dict()), HTTPStatus.OK

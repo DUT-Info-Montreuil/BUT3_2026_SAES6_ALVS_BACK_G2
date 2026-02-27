@@ -21,6 +21,7 @@ class ColliModel(Base):
     description = Column(Text, nullable=True)
     creator_id = Column(Uuid, ForeignKey('users.id'), nullable=False)
     status = Column(String(20), nullable=False, default='pending', index=True)
+    rejection_reason = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     

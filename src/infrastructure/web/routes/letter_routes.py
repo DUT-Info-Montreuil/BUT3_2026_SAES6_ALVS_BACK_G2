@@ -81,8 +81,8 @@ def create_letter(
     """
     data = request.get_json() or {}
     sender_id = get_current_user_id()
-    letter_type = data.get('letter_type', 'text')
-    
+    letter_type = data.get('letter_type', 'text').lower()
+
     if letter_type == 'text':
         if not data.get('content'):
             raise ValidationException("Le contenu est obligatoire pour une lettre texte")

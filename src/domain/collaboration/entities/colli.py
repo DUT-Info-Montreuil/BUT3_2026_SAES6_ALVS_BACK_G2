@@ -63,6 +63,7 @@ class Colli:
     description: Optional[str]
     creator_id: UUID
     status: ColliStatus = ColliStatus.PENDING
+    rejection_reason: Optional[str] = None
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
 
@@ -153,6 +154,7 @@ class Colli:
             )
 
         self.status = ColliStatus.REJECTED
+        self.rejection_reason = reason
         self._touch()
 
         self._domain_events.append(ColliRejected(
@@ -321,7 +323,9 @@ class Colli:
     # =========================================================================
 
     def is_member(self, user_id: UUID) -> bool:
-        """Vérifie si un utilisateur est membre ACCEPTED."""
+        """Vérifie si un utilisateur est membre ACCEPTED ou créateur."""
+        if self.creator_id == user_id:
+            return True
         return any(
             m.user_id == user_id and m.is_accepted
             for m in self._members

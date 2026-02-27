@@ -76,7 +76,7 @@ def export_my_data(
     all_collis = colli_repo.find_all() if hasattr(colli_repo, 'find_all') else []
     my_collis = [
         c for c in all_collis 
-        if c.creator_id == user_id or user_id in c.member_ids
+        if c.creator_id == user_id or c.has_membership(user_id)
     ]
     
     # Recuperer les lettres

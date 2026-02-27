@@ -19,12 +19,14 @@ class CommentModel(Base):
     content = Column(Text, nullable=False)
     letter_id = Column(Uuid, ForeignKey('letters.id'), nullable=False, index=True)
     sender_id = Column(Uuid, ForeignKey('users.id'), nullable=False, index=True)
+    parent_comment_id = Column(Uuid, ForeignKey('comments.id'), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    
+
     # Relations
     sender = relationship("UserModel", backref="comments")
     letter = relationship("LetterModel", back_populates="comments")
+    replies = relationship("CommentModel", foreign_keys=[parent_comment_id], lazy="select")
     
     def __repr__(self):
         return f"<CommentModel(id={self.id}, letter_id={self.letter_id})>"

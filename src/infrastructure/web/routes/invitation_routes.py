@@ -90,7 +90,7 @@ def create_invitation(
         raise NotFoundException(f"COLLI {colli_id} non trouve")
     
     # Verifier que l'utilisateur est createur ou membre
-    if colli.creator_id != user_id and user_id not in colli.member_ids:
+    if colli.creator_id != user_id and not colli.is_member(user_id):
         raise ForbiddenException("Vous n'etes pas membre de ce COLLI")
     
     data = request.get_json() or {}
@@ -223,7 +223,7 @@ def accept_invitation(
         raise NotFoundException(f"COLLI non trouve")
     
     # Verifier si deja membre
-    if user_id in colli.member_ids or user_id == colli.creator_id:
+    if colli.has_membership(user_id) or user_id == colli.creator_id:
         return jsonify({
             'message': 'Vous etes deja membre de ce COLLI',
             'colli_id': str(colli_id)

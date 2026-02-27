@@ -15,6 +15,7 @@ from src.application.exceptions import NotFoundException, ForbiddenException
 from src.infrastructure.persistence.in_memory.letter_repository import InMemoryLetterRepository
 from src.infrastructure.persistence.in_memory.comment_repository import InMemoryCommentRepository
 from src.infrastructure.persistence.in_memory.colli_repository import InMemoryColliRepository
+from src.infrastructure.persistence.in_memory.user_repository import InMemoryUserRepository
 
 
 class MockEventPublisher:
@@ -188,7 +189,7 @@ class TestGetLettersForColliUseCase:
         comment_repo = InMemoryCommentRepository()
         colli, creator_id, member_id = self._setup_colli(colli_repo)
         
-        use_case = GetLettersForColliUseCase(letter_repo, comment_repo, colli_repo)
+        use_case = GetLettersForColliUseCase(letter_repo, comment_repo, colli_repo, InMemoryUserRepository())
         result = use_case.execute(to_uuid(colli.id), member_id, page=1, per_page=20)
         
         assert result.total == 0
@@ -210,7 +211,7 @@ class TestGetLettersForColliUseCase:
                 content=f"Lettre de test numéro {i} suffisamment longue"
             ))
         
-        get_uc = GetLettersForColliUseCase(letter_repo, comment_repo, colli_repo)
+        get_uc = GetLettersForColliUseCase(letter_repo, comment_repo, colli_repo, InMemoryUserRepository())
         result = get_uc.execute(colli_uuid, member_id, page=1, per_page=20)
         
         assert result.total == 3
@@ -223,7 +224,7 @@ class TestGetLettersForColliUseCase:
         comment_repo = InMemoryCommentRepository()
         colli, creator_id, member_id = self._setup_colli(colli_repo)
         
-        use_case = GetLettersForColliUseCase(letter_repo, comment_repo, colli_repo)
+        use_case = GetLettersForColliUseCase(letter_repo, comment_repo, colli_repo, InMemoryUserRepository())
         
         with pytest.raises(ForbiddenException):
             use_case.execute(to_uuid(colli.id), uuid4(), page=1, per_page=20)
@@ -265,7 +266,7 @@ class TestGetLetterByIdUseCase:
             content="Ceci est un contenu suffisamment long."
         ))
         
-        get_uc = GetLetterByIdUseCase(letter_repo, comment_repo, colli_repo)
+        get_uc = GetLetterByIdUseCase(letter_repo, comment_repo, colli_repo, InMemoryUserRepository())
         result = get_uc.execute(to_uuid(letter.id), member_id)
         
         assert result.id == letter.id
@@ -276,7 +277,7 @@ class TestGetLetterByIdUseCase:
         letter_repo = InMemoryLetterRepository()
         comment_repo = InMemoryCommentRepository()
         
-        use_case = GetLetterByIdUseCase(letter_repo, comment_repo, colli_repo)
+        use_case = GetLetterByIdUseCase(letter_repo, comment_repo, colli_repo, InMemoryUserRepository())
         
         with pytest.raises(NotFoundException):
             use_case.execute(uuid4(), uuid4())

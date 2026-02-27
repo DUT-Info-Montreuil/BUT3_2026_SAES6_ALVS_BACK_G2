@@ -415,16 +415,16 @@ def create_user(
 @admin_bp.delete('/users/<uuid:user_id>')
 @require_role([UserRole.ADMIN])
 @inject
-def delete_user(
+def ban_user(
     user_id: UUID,
     user_repo = Provide[Container.user_repository]
 ):
     """
-    Supprimer un utilisateur
+    Bannir un utilisateur
     ---
     tags:
       - Admin
-    summary: Supprimer un utilisateur (admin uniquement)
+    summary: Bannir (desactiver) un utilisateur (admin uniquement)
     security:
       - BearerAuth: []
     parameters:
@@ -435,8 +435,12 @@ def delete_user(
           type: string
           format: uuid
     responses:
-      204:
-        description: Utilisateur supprime
+      200:
+        description: Utilisateur banni
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
       401:
         $ref: '#/components/responses/Unauthorized'
       403:
@@ -447,12 +451,61 @@ def delete_user(
     user = user_repo.find_by_id(user_id)
     if not user:
         raise NotFoundException(f"Utilisateur {user_id} non trouve")
-    
-    # Empecher de se supprimer soi-meme
+
+    # Empecher de se bannir soi-meme
     current_user_id = get_current_user_id()
     if user_id == current_user_id:
-        raise ValidationException("Vous ne pouvez pas supprimer votre propre compte")
-    
-    user_repo.delete(user)
-    
-    return '', HTTPStatus.NO_CONTENT
+        raise ValidationException("Vous ne pouvez pas bannir votre propre compte")
+
+    user.deactivate()
+    user_repo.save(user)
+
+    from src.application.dtos.user_dto import UserResponseDTO
+    return jsonify(UserResponseDTO.from_entity(user).to_dict()), HTTPStatus.OK
+
+
+@admin_bp.post('/users/<uuid:user_id>/reactivate')
+@require_role([UserRole.ADMIN])
+@inject
+def reactivate_user(
+    user_id: UUID,
+    user_repo = Provide[Container.user_repository]
+):
+    """
+    Reactiver un utilisateur
+    ---
+    tags:
+      - Admin
+    summary: Reactiver un utilisateur banni (admin uniquement)
+    security:
+      - BearerAuth: []
+    parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      200:
+        description: Utilisateur reactive
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+      401:
+        $ref: '#/components/responses/Unauthorized'
+      403:
+        $ref: '#/components/responses/Forbidden'
+      404:
+        $ref: '#/components/responses/NotFound'
+    """
+    user = user_repo.find_by_id(user_id)
+    if not user:
+        raise NotFoundException(f"Utilisateur {user_id} non trouve")
+
+    user.reactivate()
+    user_repo.save(user)
+
+    from src.application.dtos.user_dto import UserResponseDTO
+    return jsonify(UserResponseDTO.from_entity(user).to_dict()), HTTPStatus.OK

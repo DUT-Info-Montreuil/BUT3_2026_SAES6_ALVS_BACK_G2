@@ -42,9 +42,8 @@ class RejectColliUseCase:
                 f"Impossible de rejeter un COLLI au statut {colli.status.value}"
             )
         
-        # Rejeter le COLLI
-        colli.status = ColliStatus.REJECTED
-        # Note: on pourrait stocker la raison dans un champ supplementaire
+        # Rejeter le COLLI via la méthode domaine
+        colli.reject(command.reason, command.admin_id)
         
         self._colli_repo.save(colli)
         

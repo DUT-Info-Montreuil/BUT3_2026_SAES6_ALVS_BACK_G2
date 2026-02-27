@@ -50,9 +50,10 @@ class LetterResponseDTO:
     created_at: str
     updated_at: str
     comment_count: int = 0
+    sender: Optional[dict] = None
 
     @classmethod
-    def from_entity(cls, letter: Letter, comment_count: int = 0) -> "LetterResponseDTO":
+    def from_entity(cls, letter: Letter, comment_count: int = 0, sender_data: Optional[dict] = None) -> "LetterResponseDTO":
         """Construit le DTO depuis une entité."""
         return cls(
             id=str(letter.id),
@@ -65,9 +66,10 @@ class LetterResponseDTO:
             sender_id=str(letter.sender_id),
             created_at=letter.created_at.isoformat(),
             updated_at=letter.updated_at.isoformat(),
-            comment_count=comment_count
+            comment_count=comment_count,
+            sender=sender_data
         )
-    
+
     def to_dict(self) -> dict:
         """Convertit en dictionnaire."""
         return asdict(self)

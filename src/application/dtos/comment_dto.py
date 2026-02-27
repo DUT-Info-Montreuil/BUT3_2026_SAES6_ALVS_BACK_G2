@@ -2,6 +2,7 @@
 """DTOs pour les Comments."""
 
 from dataclasses import dataclass, asdict
+from typing import Optional
 from uuid import UUID
 
 from src.domain.collaboration.entities.comment import Comment
@@ -13,6 +14,7 @@ class CreateCommentCommand:
     letter_id: UUID
     sender_id: UUID
     content: str
+    parent_comment_id: Optional[UUID] = None
 
 
 @dataclass
@@ -30,9 +32,10 @@ class CommentResponseDTO:
     content: str
     letter_id: str
     sender_id: str
+    parent_comment_id: Optional[str]
     created_at: str
     updated_at: str
-    
+
     @classmethod
     def from_entity(cls, comment: Comment) -> "CommentResponseDTO":
         """Construit le DTO depuis une entité."""
@@ -41,6 +44,7 @@ class CommentResponseDTO:
             content=comment.content,
             letter_id=str(comment.letter_id),
             sender_id=str(comment.sender_id),
+            parent_comment_id=str(comment.parent_comment_id) if comment.parent_comment_id else None,
             created_at=comment.created_at.isoformat(),
             updated_at=comment.updated_at.isoformat()
         )

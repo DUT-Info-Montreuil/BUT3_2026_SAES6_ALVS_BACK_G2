@@ -36,6 +36,7 @@ class Comment:
     letter_id: UUID
     sender_id: UUID
     content: str
+    parent_comment_id: Optional[UUID] = None
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
     
@@ -44,16 +45,18 @@ class Comment:
         cls,
         letter_id: UUID,
         sender_id: UUID,
-        content: str
+        content: str,
+        parent_comment_id: Optional[UUID] = None
     ) -> "Comment":
         """
         Factory pour créer un commentaire.
-        
+
         Args:
             letter_id: ID de la lettre parente.
             sender_id: ID de l'utilisateur qui commente.
             content: Contenu du commentaire.
-            
+            parent_comment_id: ID du commentaire parent (pour le threading).
+
         Returns:
             Comment: Nouveau commentaire.
         """
@@ -61,17 +64,18 @@ class Comment:
             raise CommentValidationException(
                 "Le contenu du commentaire est obligatoire"
             )
-        
+
         if len(content.strip()) > 5000:
             raise CommentValidationException(
                 "Le commentaire ne peut pas dépasser 5000 caractères"
             )
-        
+
         return cls(
             id=uuid4(),
             letter_id=letter_id,
             sender_id=sender_id,
-            content=content.strip()
+            content=content.strip(),
+            parent_comment_id=parent_comment_id
         )
     
     def update_content(self, new_content: str, editor_id: UUID) -> None:

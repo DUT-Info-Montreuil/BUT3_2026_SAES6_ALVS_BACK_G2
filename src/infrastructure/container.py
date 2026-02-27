@@ -139,7 +139,8 @@ class Container(containers.DeclarativeContainer):
 
     list_members_use_case = providers.Factory(
         "src.application.use_cases.colli.list_members.ListMembersUseCase",
-        colli_repository=colli_repository
+        colli_repository=colli_repository,
+        user_repository=user_repository
     )
     
     update_colli_use_case = providers.Factory(
@@ -201,14 +202,16 @@ class Container(containers.DeclarativeContainer):
         "src.application.use_cases.letter.get_letters.GetLettersForColliUseCase",
         letter_repository=letter_repository,
         comment_repository=comment_repository,
-        colli_repository=colli_repository
+        colli_repository=colli_repository,
+        user_repository=user_repository
     )
-    
+
     get_letter_use_case = providers.Factory(
         "src.application.use_cases.letter.get_letters.GetLetterByIdUseCase",
         letter_repository=letter_repository,
         comment_repository=comment_repository,
-        colli_repository=colli_repository
+        colli_repository=colli_repository,
+        user_repository=user_repository
     )
     
     delete_letter_use_case = providers.Factory(

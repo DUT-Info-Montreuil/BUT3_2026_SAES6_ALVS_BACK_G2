@@ -65,6 +65,7 @@ class ColliMapper:
             description=model.description,
             creator_id=model.creator_id,
             status=ColliStatus(model.status),
+            rejection_reason=model.rejection_reason,
             created_at=model.created_at,
             updated_at=model.updated_at
         )
@@ -95,6 +96,7 @@ class ColliMapper:
             description=entity.description,
             creator_id=entity.creator_id,
             status=entity.status.value,
+            rejection_reason=entity.rejection_reason,
             created_at=entity.created_at,
             updated_at=entity.updated_at
         )
@@ -122,6 +124,7 @@ class ColliMapper:
         model.theme = entity.theme
         model.description = entity.description
         model.status = entity.status.value
+        model.rejection_reason = entity.rejection_reason
         model.updated_at = entity.updated_at
         
         # Synchroniser les membres

@@ -11,12 +11,27 @@ from src.domain.identity.value_objects.user_role import UserRole
 from src.application.exceptions import UnauthorizedException, ForbiddenException
 
 
+def _check_user_active(user_id: UUID) -> None:
+    """
+    Vérifie que l'utilisateur est toujours actif (non banni).
+
+    Raises:
+        ForbiddenException: Si l'utilisateur est désactivé.
+    """
+    from src.infrastructure.container import Container
+    user_repo = Container.user_repository()
+    user = user_repo.find_by_id(user_id)
+    if user and not user.is_active:
+        raise ForbiddenException("Votre compte a été désactivé")
+
+
 def require_auth(fn: Callable) -> Callable:
     """
     Décorateur qui requiert une authentification JWT.
-    
+
     Extrait automatiquement le user_id du token et le place dans g.current_user_id.
     JAMAIS depuis le body de la requête.
+    Vérifie également que l'utilisateur est toujours actif (non banni).
     """
     @wraps(fn)
     def wrapper(*args, **kwargs):
@@ -26,22 +41,26 @@ def require_auth(fn: Callable) -> Callable:
                 current_app.config['JWT_TOKEN_LOCATION'] = ['headers']
                 current_app.config['JWT_HEADER_NAME'] = 'Authorization'
                 current_app.config['JWT_HEADER_TYPE'] = 'Bearer'
-            
+
             verify_jwt_in_request()
         except Exception as e:
             raise UnauthorizedException("Token d'authentification invalide ou manquant")
-        
+
         # Extraire l'identité depuis le JWT (JAMAIS depuis le body)
         identity = get_jwt_identity()
         if not identity:
             raise UnauthorizedException("Token invalide: identité manquante")
-        
+
+        # Vérifier que l'utilisateur est toujours actif
+        user_id = UUID(identity)
+        _check_user_active(user_id)
+
         # Stocker dans le contexte Flask pour accès ultérieur
-        g.current_user_id = UUID(identity)
+        g.current_user_id = user_id
         g.current_user_role = get_jwt().get("role", "member")
-        
+
         return fn(*args, **kwargs)
-    
+
     return wrapper
 
 
@@ -71,37 +90,41 @@ def require_role(allowed_roles: List[UserRole]) -> Callable:
                     current_app.config['JWT_TOKEN_LOCATION'] = ['headers']
                     current_app.config['JWT_HEADER_NAME'] = 'Authorization'
                     current_app.config['JWT_HEADER_TYPE'] = 'Bearer'
-                
+
                 verify_jwt_in_request()
             except Exception:
                 raise UnauthorizedException("Authentification requise")
-            
+
             # Extraire les informations du JWT
             identity = get_jwt_identity()
             claims = get_jwt()
             user_role_str = claims.get("role", "member")
-            
+
+            # Vérifier que l'utilisateur est toujours actif
+            user_id = UUID(identity)
+            _check_user_active(user_id)
+
             # Convertir en enum et vérifier
             try:
                 user_role = UserRole(user_role_str)
             except ValueError:
                 raise ForbiddenException(f"Rôle invalide: {user_role_str}")
-            
+
             # Vérifier si le rôle est autorisé
             if user_role not in allowed_roles:
                 raise ForbiddenException(
                     f"Action non autorisée pour le rôle {user_role.value}. "
                     f"Rôles requis: {[r.value for r in allowed_roles]}"
                 )
-            
+
             # Stocker dans le contexte
-            g.current_user_id = UUID(identity)
+            g.current_user_id = user_id
             g.current_user_role = user_role
-            
+
             return fn(*args, **kwargs)
-        
+
         return wrapper
-    
+
     return decorator
 
 

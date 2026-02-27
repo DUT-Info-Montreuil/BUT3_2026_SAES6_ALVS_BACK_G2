@@ -4,6 +4,7 @@
 from flask import Blueprint, request, jsonify
 from http import HTTPStatus
 from uuid import UUID
+from typing import Optional
 from dependency_injector.wiring import inject, Provide
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
@@ -71,11 +72,19 @@ def create_comment(
     
     if not data.get('content'):
         raise ValidationException("Le contenu est obligatoire")
-    
+
+    parent_comment_id = None
+    if data.get('parent_comment_id'):
+        try:
+            parent_comment_id = UUID(data['parent_comment_id'])
+        except ValueError:
+            raise ValidationException("parent_comment_id invalide")
+
     result = use_case.execute(CreateCommentCommand(
         letter_id=letter_id,
         sender_id=sender_id,
-        content=data['content']
+        content=data['content'],
+        parent_comment_id=parent_comment_id
     ))
     
     return jsonify(result.to_dict()), HTTPStatus.CREATED

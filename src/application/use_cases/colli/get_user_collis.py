@@ -51,7 +51,7 @@ class GetUserCollisUseCase:
         user_collis = []
         for colli in all_collis:
             is_creator = colli.creator_id == user_id
-            is_member = user_id in colli.member_ids
+            is_member = colli.has_membership(user_id)
             
             if role_filter == ColliRoleFilter.CREATOR and is_creator:
                 user_collis.append(colli)

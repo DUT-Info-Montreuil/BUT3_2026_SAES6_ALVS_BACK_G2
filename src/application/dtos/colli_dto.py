@@ -27,10 +27,11 @@ class ColliResponseDTO:
     description: Optional[str]
     creator_id: str
     status: str
+    rejection_reason: Optional[str]
     member_count: int
     created_at: str
     updated_at: str
-    
+
     @classmethod
     def from_entity(cls, colli: Colli) -> "ColliResponseDTO":
         """Construit le DTO depuis une entité du domaine."""
@@ -41,6 +42,7 @@ class ColliResponseDTO:
             description=colli.description,
             creator_id=str(colli.creator_id),
             status=colli.status.value,
+            rejection_reason=colli.rejection_reason,
             member_count=colli.member_count,
             created_at=colli.created_at.isoformat(),
             updated_at=colli.updated_at.isoformat()

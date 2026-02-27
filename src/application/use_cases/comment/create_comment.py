@@ -56,7 +56,8 @@ class CreateCommentUseCase:
             comment = Comment.create(
                 letter_id=command.letter_id,
                 sender_id=command.sender_id,
-                content=command.content
+                content=command.content,
+                parent_comment_id=command.parent_comment_id
             )
         except Exception as e:
             raise ValidationException(str(e))

@@ -1,7 +1,7 @@
 # src/infrastructure/persistence/sqlalchemy/models/comment_model.py
 """Modèle SQLAlchemy pour les Comments."""
 
-from sqlalchemy import Column, Text, DateTime, ForeignKey, Uuid
+from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Uuid
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import uuid
@@ -20,6 +20,7 @@ class CommentModel(Base):
     letter_id = Column(Uuid, ForeignKey('letters.id'), nullable=False, index=True)
     sender_id = Column(Uuid, ForeignKey('users.id'), nullable=False, index=True)
     parent_comment_id = Column(Uuid, ForeignKey('comments.id'), nullable=True)
+    attachment_url = Column(String(500), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

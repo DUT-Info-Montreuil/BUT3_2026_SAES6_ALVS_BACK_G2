@@ -70,12 +70,15 @@ class SQLAlchemyColliRepository(IColliRepository):
             .all()
         return ColliMapper.to_entity_list(models)
     
-    def find_by_status(self, status: ColliStatus) -> List[Colli]:
-        """Récupère les Collis par statut."""
+    def find_by_status(self, status: ColliStatus, page: int = 1, per_page: int = 20) -> List[Colli]:
+        """Récupère les Collis par statut avec pagination."""
+        offset = (page - 1) * per_page
         models = self._session.query(ColliModel)\
             .options(joinedload(ColliModel.members))\
             .filter_by(status=status.value)\
             .order_by(ColliModel.created_at.desc())\
+            .offset(offset)\
+            .limit(per_page)\
             .all()
         return ColliMapper.to_entity_list(models)
     

@@ -150,11 +150,12 @@ def list_collis(
         params = schema.load(request.args)
     except ValidationError as err:
         raise ValidationException("Paramètres invalides", errors=err.messages)
-    
+
     page = params.get('page', 1)
     per_page = params.get('per_page', 20)
-    
-    result = use_case.execute(page, per_page)
+    status = params.get('status')
+
+    result = use_case.execute(page, per_page, status=status)
     return jsonify(result), HTTPStatus.OK
 
 

@@ -63,13 +63,15 @@ class IColliRepository(ABC):
         pass
     
     @abstractmethod
-    def find_by_status(self, status: ColliStatus) -> List[Colli]:
+    def find_by_status(self, status: ColliStatus, page: int = 1, per_page: int = 20) -> List[Colli]:
         """
-        Récupère tous les Collis ayant un statut donné.
-        
+        Récupère les Collis ayant un statut donné, avec pagination.
+
         Args:
             status: Le statut à filtrer.
-        
+            page: Numéro de page (1-indexed).
+            per_page: Nombre d'éléments par page.
+
         Returns:
             List[Colli]: Liste des Collis correspondants.
         """

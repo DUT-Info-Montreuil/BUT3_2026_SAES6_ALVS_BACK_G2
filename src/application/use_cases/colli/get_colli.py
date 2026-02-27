@@ -2,9 +2,10 @@
 """Use Cases: Récupérer un ou plusieurs Collis."""
 
 from uuid import UUID
-from typing import List
+from typing import List, Optional
 
 from src.domain.collaboration.repositories.colli_repository import IColliRepository
+from src.domain.collaboration.value_objects.colli_status import ColliStatus
 from src.application.dtos.colli_dto import ColliResponseDTO
 from src.application.exceptions import NotFoundException, ForbiddenException
 
@@ -25,16 +26,21 @@ class GetColliByIdUseCase:
 
 
 class ListCollisUseCase:
-    """Use Case: Lister les COLLIs avec pagination."""
-    
+    """Use Case: Lister les COLLIs avec pagination et filtre optionnel."""
+
     def __init__(self, colli_repository: IColliRepository):
         self._colli_repo = colli_repository
-    
-    def execute(self, page: int = 1, per_page: int = 20) -> dict:
-        """Liste les COLLIs paginés."""
-        collis = self._colli_repo.find_all(page, per_page)
-        total = self._colli_repo.count()
-        
+
+    def execute(self, page: int = 1, per_page: int = 20, status: Optional[str] = None) -> dict:
+        """Liste les COLLIs paginés, avec filtre par statut optionnel."""
+        if status:
+            colli_status = ColliStatus(status)
+            collis = self._colli_repo.find_by_status(colli_status, page, per_page)
+            total = self._colli_repo.count_by_status(colli_status)
+        else:
+            collis = self._colli_repo.find_all(page, per_page)
+            total = self._colli_repo.count()
+
         return {
             'items': [ColliResponseDTO.from_entity(c).to_dict() for c in collis],
             'total': total,

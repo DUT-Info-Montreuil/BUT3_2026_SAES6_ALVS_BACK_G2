@@ -158,7 +158,7 @@ class EmailService:
                     </p>
                     <p>Ou copiez ce code dans l'application :</p>
                     <p class="code">{reset_token}</p>
-                    <p><strong>Ce lien expire dans 1 heure.</strong></p>
+                    <p><strong>Ce lien expire dans 15 minutes.</strong></p>
                     <p>Si vous n'avez pas demande cette reinitialisation, ignorez cet email.</p>
                 </div>
                 <div class="footer">

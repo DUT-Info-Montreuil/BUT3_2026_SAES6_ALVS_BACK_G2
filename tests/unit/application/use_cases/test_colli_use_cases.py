@@ -8,7 +8,7 @@ from src.application.use_cases.colli.create_colli import CreateColliUseCase, Cre
 from src.application.use_cases.colli.approve_colli import ApproveColliUseCase, ApproveColliCommand
 from src.application.use_cases.colli.get_colli import GetColliByIdUseCase, ListCollisUseCase
 from src.application.use_cases.colli.delete_colli import DeleteColliUseCase
-from src.application.use_cases.colli.membership import JoinColliUseCase, LeaveColliUseCase
+from src.application.use_cases.colli.membership import JoinColliUseCase, LeaveColliUseCase, AcceptMemberUseCase
 from src.application.use_cases.colli.list_members import ListMembersUseCase
 from src.application.exceptions import NotFoundException, ForbiddenException
 from src.infrastructure.persistence.in_memory.colli_repository import InMemoryColliRepository
@@ -252,20 +252,22 @@ class TestLeaveColliUseCase:
         create_uc = CreateColliUseCase(repo)
         approve_uc = ApproveColliUseCase(repo, ColliTestEventPublisher())
         join_uc = JoinColliUseCase(repo)
+        accept_uc = AcceptMemberUseCase(repo)
         leave_uc = LeaveColliUseCase(repo)
-        
+
         creator_id = uuid4()
         member_id = uuid4()
-        
+
         colli = create_uc.execute(CreateColliCommand(
             name="Test", theme="Test", description=None, creator_id=creator_id
         ))
         colli_uuid = to_uuid(colli.id)
         approve_uc.execute(ApproveColliCommand(colli_id=colli_uuid, approver_id=uuid4()))
         join_uc.execute(colli_uuid, member_id)
-        
+        accept_uc.execute(colli_uuid, member_id, creator_id)
+
         result = leave_uc.execute(colli_uuid, member_id)
-        
+
         assert result is True
     
     def test_creator_cannot_leave(self):
@@ -296,18 +298,23 @@ class TestListMembersUseCase:
         create_uc = CreateColliUseCase(repo)
         approve_uc = ApproveColliUseCase(repo, ColliTestEventPublisher())
         join_uc = JoinColliUseCase(repo)
+        accept_uc = AcceptMemberUseCase(repo)
         list_uc = ListMembersUseCase(repo)
-        
+
         creator_id = uuid4()
         colli = create_uc.execute(CreateColliCommand(
             name="Test", theme="Test", description=None, creator_id=creator_id
         ))
         colli_uuid = to_uuid(colli.id)
         approve_uc.execute(ApproveColliCommand(colli_id=colli_uuid, approver_id=uuid4()))
-        join_uc.execute(colli_uuid, uuid4())
-        join_uc.execute(colli_uuid, uuid4())
-        
+        member1_id = uuid4()
+        member2_id = uuid4()
+        join_uc.execute(colli_uuid, member1_id)
+        join_uc.execute(colli_uuid, member2_id)
+        accept_uc.execute(colli_uuid, member1_id, creator_id)
+        accept_uc.execute(colli_uuid, member2_id, creator_id)
+
         result = list_uc.execute(colli_uuid, creator_id)
-        
+
         assert result['total'] == 3  # creator + 2 members
 

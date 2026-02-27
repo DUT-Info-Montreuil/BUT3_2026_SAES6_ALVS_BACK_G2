@@ -23,8 +23,8 @@ class CreateColliUseCase:
     Use Case: Créer un nouveau COLLI.
 
     Règles métier:
-    - Seuls les enseignants et admins peuvent créer un COLLI
-    - Le COLLI est créé en statut PENDING
+    - Tout utilisateur authentifié peut créer un COLLI
+    - Le COLLI est créé en statut PENDING (nécessite approbation admin)
     - Le créateur sera automatiquement ajouté comme MANAGER à l'approbation
     """
 

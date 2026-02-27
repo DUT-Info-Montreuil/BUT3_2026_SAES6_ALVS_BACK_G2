@@ -22,6 +22,7 @@ class LetterMapper:
             content=model.content,
             file_url=model.file_url,
             file_name=model.file_name,
+            title=model.title,
             colli_id=model.colli_id,
             sender_id=model.sender_id,
             created_at=model.created_at,
@@ -39,6 +40,7 @@ class LetterMapper:
             content=entity.content,
             file_url=entity.file_url,
             file_name=entity.file_name,
+            title=entity.title,
             colli_id=entity.colli_id,
             sender_id=entity.sender_id,
             created_at=entity.created_at,
@@ -53,5 +55,6 @@ class LetterMapper:
         model.content = entity.content
         model.file_url = entity.file_url
         model.file_name = entity.file_name
+        model.title = entity.title
         model.updated_at = entity.updated_at
         return model

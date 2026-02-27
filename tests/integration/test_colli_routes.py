@@ -42,21 +42,23 @@ class TestColliRoutes:
         
         assert response.status_code == 401
     
-    def test_create_colli_forbidden_student(self, client, app):
-        """POST /api/v1/collis - Doit refuser pour un étudiant."""
+    def test_create_colli_student_allowed(self, client, app):
+        """POST /api/v1/collis - Tout utilisateur authentifié peut créer un COLLI."""
         with app.app_context():
             token = create_access_token(
                 identity=str(uuid4()),
                 additional_claims={'role': 'student'}
             )
-        
+
         response = client.post(
             '/api/v1/collis',
             json={'name': 'Test', 'theme': 'Test'},
             headers={'Authorization': f'Bearer {token}'}
         )
-        
-        assert response.status_code == 403
+
+        assert response.status_code == 201
+        data = response.get_json()
+        assert data['status'] == 'pending'
     
     def test_create_colli_validation_error(self, client, app):
         """POST /api/v1/collis - Doit valider les données."""

@@ -20,6 +20,7 @@ class CommentMapper:
             content=model.content,
             letter_id=model.letter_id,
             sender_id=model.sender_id,
+            parent_comment_id=model.parent_comment_id,
             created_at=model.created_at,
             updated_at=model.updated_at
         )
@@ -34,6 +35,7 @@ class CommentMapper:
             content=entity.content,
             letter_id=entity.letter_id,
             sender_id=entity.sender_id,
+            parent_comment_id=entity.parent_comment_id,
             created_at=entity.created_at,
             updated_at=entity.updated_at
         )

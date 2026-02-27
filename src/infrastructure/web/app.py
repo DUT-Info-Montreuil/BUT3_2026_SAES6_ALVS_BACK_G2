@@ -253,7 +253,7 @@ def create_app(config_override: dict = None) -> Flask:
     cors_origins = [origin.strip() for origin in cors_origin.split(',')]
     
     # Initialiser les extensions
-    CORS(app, origins=cors_origins)
+    CORS(app, origins=cors_origins, supports_credentials=True)
     init_jwt(app)
     init_rate_limiter(app)
     

@@ -1,38 +1,42 @@
 # src/infrastructure/web/routes/colli_routes.py
 """Routes pour les COLLIs avec documentation OpenAPI."""
 
+from flask import Blueprint, request, jsonify
 from http import HTTPStatus
 from uuid import UUID
-
-from dependency_injector.wiring import Provide, inject
-from flask import Blueprint, jsonify, request
-from flask_jwt_extended import get_jwt_identity, jwt_required
 from marshmallow import ValidationError
+from dependency_injector.wiring import inject, Provide
+from flask_jwt_extended import jwt_required, get_jwt_identity
 
-from src.application.exceptions import ValidationException
-from src.application.use_cases.colli.approve_colli import ApproveColliCommand, ApproveColliUseCase
-from src.application.use_cases.colli.create_colli import CreateColliCommand, CreateColliUseCase
-from src.application.use_cases.colli.delete_colli import DeleteColliUseCase
-from src.application.use_cases.colli.get_colli import GetColliByIdUseCase, ListCollisUseCase
-from src.application.use_cases.colli.membership import JoinColliUseCase, LeaveColliUseCase
-from src.domain.identity.value_objects.user_role import UserRole
-from src.infrastructure.container import Container
-from src.infrastructure.web.middlewares.auth_middleware import (
-    require_role,
-)
 from src.infrastructure.web.schemas.colli_schema import (
-    ColliListQuerySchema,
     CreateColliSchema,
     UpdateColliSchema,
+    RejectColliSchema,
+    AddMemberSchema,
+    ColliListQuerySchema
 )
+from src.infrastructure.web.middlewares.auth_middleware import (
+    require_auth,
+    require_role,
+    get_current_user_id
+)
+from src.domain.identity.value_objects.user_role import UserRole
+from src.application.exceptions import ValidationException
+from src.application.use_cases.colli.create_colli import CreateColliUseCase, CreateColliCommand
+from src.application.use_cases.colli.approve_colli import ApproveColliUseCase, ApproveColliCommand
+from src.application.use_cases.colli.get_colli import GetColliByIdUseCase, ListCollisUseCase
+from src.application.use_cases.colli.delete_colli import DeleteColliUseCase
+from src.application.use_cases.colli.membership import (
+    JoinColliUseCase, LeaveColliUseCase, AcceptMemberUseCase, RejectMemberUseCase
+)
+from src.infrastructure.container import Container
 
-# Utiliser un nom unique pour éviter les conflits de blueprint
-colli_bp = Blueprint('colli_routes_v1', __name__, url_prefix='/api/v1/collis')
+
+colli_bp = Blueprint('collis', __name__, url_prefix='/api/v1/collis')
 
 
 @colli_bp.post('')
-@jwt_required()
-@require_role([UserRole.TEACHER, UserRole.ADMIN])
+@require_auth
 @inject
 def create_colli(
     use_case: CreateColliUseCase = Provide[Container.create_colli_use_case]
@@ -81,21 +85,21 @@ def create_colli(
         data = schema.load(request.get_json() or {})
     except ValidationError as err:
         raise ValidationException("Données invalides", errors=err.messages)
-
-    creator_id = get_jwt_identity()
-
+    
+    creator_id = get_current_user_id()
+    
     result = use_case.execute(CreateColliCommand(
         name=data['name'],
         theme=data['theme'],
         description=data.get('description'),
         creator_id=creator_id
     ))
-
+    
     return jsonify(result.to_dict()), HTTPStatus.CREATED
 
 
 @colli_bp.get('')
-@jwt_required()
+@require_auth
 @inject
 def list_collis(
     use_case: ListCollisUseCase = Provide[Container.list_collis_use_case]
@@ -146,16 +150,16 @@ def list_collis(
         params = schema.load(request.args)
     except ValidationError as err:
         raise ValidationException("Paramètres invalides", errors=err.messages)
-
+    
     page = params.get('page', 1)
     per_page = params.get('per_page', 20)
-
+    
     result = use_case.execute(page, per_page)
     return jsonify(result), HTTPStatus.OK
 
 
 @colli_bp.get('/<uuid:colli_id>')
-@jwt_required()
+@require_auth
 @inject
 def get_colli(
     colli_id: UUID,
@@ -188,13 +192,13 @@ def get_colli(
       404:
         $ref: '#/components/responses/NotFound'
     """
-    user_id = get_jwt_identity()
+    user_id = get_current_user_id()
     result = use_case.execute(colli_id, user_id)
     return jsonify(result.to_dict()), HTTPStatus.OK
 
 
 @colli_bp.delete('/<uuid:colli_id>')
-@jwt_required()
+@require_auth
 @inject
 def delete_colli(
     colli_id: UUID,
@@ -225,13 +229,12 @@ def delete_colli(
       404:
         $ref: '#/components/responses/NotFound'
     """
-    user_id = get_jwt_identity()
+    user_id = get_current_user_id()
     use_case.execute(colli_id, user_id)
     return '', HTTPStatus.NO_CONTENT
 
 
 @colli_bp.patch('/<uuid:colli_id>/approve')
-@jwt_required()
 @require_role([UserRole.ADMIN])
 @inject
 def approve_colli(
@@ -267,18 +270,41 @@ def approve_colli(
       404:
         $ref: '#/components/responses/NotFound'
     """
-    approver_id = get_jwt_identity()
+    approver_id = get_current_user_id()
 
     result = use_case.execute(ApproveColliCommand(
         colli_id=colli_id,
         approver_id=approver_id
     ))
 
+    # Notifications et WebSocket
+    try:
+        from src.infrastructure.services.notification_service import get_notification_service
+        from src.infrastructure.websocket.socket_manager import notify_colli_status_change
+        from src.infrastructure.security.audit_logger import log_audit_event, AuditEvent
+
+        colli_name = result.name if hasattr(result, 'name') else str(colli_id)
+        creator_id = result.creator_id if hasattr(result, 'creator_id') else None
+
+        if creator_id:
+            get_notification_service().notify_colli_approved(
+                colli_id=colli_id,
+                colli_name=colli_name,
+                creator_id=creator_id
+            )
+
+        notify_colli_status_change(str(colli_id), 'active', colli_name)
+        log_audit_event(AuditEvent.COLLI_APPROVED, str(approver_id), details={
+            "colli_id": str(colli_id), "colli_name": colli_name
+        })
+    except Exception:
+        pass  # Ne pas bloquer l'approbation si les notifications echouent
+
     return jsonify(result.to_dict()), HTTPStatus.OK
 
 
 @colli_bp.post('/<uuid:colli_id>/join')
-@jwt_required()
+@require_auth
 @inject
 def join_colli(
     colli_id: UUID,
@@ -314,13 +340,101 @@ def join_colli(
       404:
         $ref: '#/components/responses/NotFound'
     """
-    user_id = get_jwt_identity()
+    user_id = get_current_user_id()
     result = use_case.execute(colli_id, user_id)
+    return jsonify(result), HTTPStatus.OK
+
+
+@colli_bp.patch('/<uuid:colli_id>/members/<uuid:user_id>/accept')
+@require_auth
+@inject
+def accept_member(
+    colli_id: UUID,
+    user_id: UUID,
+    use_case: AcceptMemberUseCase = Provide[Container.accept_member_use_case]
+):
+    """
+    Accepter une demande d'adhésion
+    ---
+    tags:
+      - COLLI
+    summary: Accepter une demande d'adhésion (manager uniquement)
+    security:
+      - BearerAuth: []
+    parameters:
+      - name: colli_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      200:
+        description: Membre accepté
+      401:
+        $ref: '#/components/responses/Unauthorized'
+      403:
+        $ref: '#/components/responses/Forbidden'
+      404:
+        $ref: '#/components/responses/NotFound'
+    """
+    requester_id = get_current_user_id()
+    result = use_case.execute(colli_id, user_id, requester_id)
+    return jsonify(result.to_dict()), HTTPStatus.OK
+
+
+@colli_bp.patch('/<uuid:colli_id>/members/<uuid:user_id>/reject')
+@require_auth
+@inject
+def reject_member(
+    colli_id: UUID,
+    user_id: UUID,
+    use_case: RejectMemberUseCase = Provide[Container.reject_member_use_case]
+):
+    """
+    Rejeter une demande d'adhésion
+    ---
+    tags:
+      - COLLI
+    summary: Rejeter une demande d'adhésion (manager uniquement)
+    security:
+      - BearerAuth: []
+    parameters:
+      - name: colli_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      200:
+        description: Membre rejeté
+      401:
+        $ref: '#/components/responses/Unauthorized'
+      403:
+        $ref: '#/components/responses/Forbidden'
+      404:
+        $ref: '#/components/responses/NotFound'
+    """
+    requester_id = get_current_user_id()
+    result = use_case.execute(colli_id, user_id, requester_id)
     return jsonify(result.to_dict()), HTTPStatus.OK
 
 
 @colli_bp.post('/<uuid:colli_id>/leave')
-@jwt_required()
+@require_auth
 @inject
 def leave_colli(
     colli_id: UUID,
@@ -349,13 +463,13 @@ def leave_colli(
       404:
         $ref: '#/components/responses/NotFound'
     """
-    user_id = get_jwt_identity()
+    user_id = get_current_user_id()
     use_case.execute(colli_id, user_id)
     return '', HTTPStatus.NO_CONTENT
 
 
 @colli_bp.get('/<uuid:colli_id>/members')
-@jwt_required()
+@require_auth
 @inject
 def list_members(
     colli_id: UUID,
@@ -390,13 +504,13 @@ def list_members(
       404:
         $ref: '#/components/responses/NotFound'
     """
-    user_id = get_jwt_identity()
+    user_id = get_current_user_id()
     result = use_case.execute(colli_id, user_id)
     return jsonify(result), HTTPStatus.OK
 
 
 @colli_bp.get('/mine')
-@jwt_required()
+@require_auth
 @inject
 def get_my_collis(
     use_case = Provide[Container.get_user_collis_use_case]
@@ -444,23 +558,23 @@ def get_my_collis(
         $ref: '#/components/responses/Unauthorized'
     """
     from src.application.use_cases.colli.get_user_collis import ColliRoleFilter
-
-    user_id = get_jwt_identity()
+    
+    user_id = get_current_user_id()
     role_str = request.args.get('role', 'all')
     page = request.args.get('page', 1, type=int)
     per_page = min(request.args.get('per_page', 20, type=int), 100)
-
+    
     try:
         role_filter = ColliRoleFilter(role_str)
     except ValueError:
         role_filter = ColliRoleFilter.ALL
-
+    
     result = use_case.execute(user_id, role_filter, page, per_page)
     return jsonify(result), HTTPStatus.OK
 
 
 @colli_bp.patch('/<uuid:colli_id>')
-@jwt_required()
+@require_auth
 @inject
 def update_colli(
     colli_id: UUID,
@@ -509,15 +623,15 @@ def update_colli(
         $ref: '#/components/responses/NotFound'
     """
     from src.application.use_cases.colli.update_colli import UpdateColliCommand
-
+    
     schema = UpdateColliSchema()
     try:
         data = schema.load(request.get_json() or {})
     except ValidationError as err:
         raise ValidationException("Donnees invalides", errors=err.messages)
-
-    user_id = get_jwt_identity()
-
+    
+    user_id = get_current_user_id()
+    
     result = use_case.execute(UpdateColliCommand(
         colli_id=colli_id,
         user_id=user_id,
@@ -525,12 +639,11 @@ def update_colli(
         theme=data.get('theme'),
         description=data.get('description')
     ))
-
+    
     return jsonify(result.to_dict()), HTTPStatus.OK
 
 
 @colli_bp.patch('/<uuid:colli_id>/reject')
-@jwt_required()
 @require_role([UserRole.ADMIN])
 @inject
 def reject_colli(
@@ -578,12 +691,37 @@ def reject_colli(
     from src.application.use_cases.colli.reject_colli import RejectColliCommand
 
     data = request.get_json() or {}
-    admin_id = get_jwt_identity()
+    admin_id = get_current_user_id()
+    reason = data.get('reason')
 
     result = use_case.execute(RejectColliCommand(
         colli_id=colli_id,
         admin_id=admin_id,
-        reason=data.get('reason')
+        reason=reason
     ))
+
+    # Notifications et WebSocket
+    try:
+        from src.infrastructure.services.notification_service import get_notification_service
+        from src.infrastructure.websocket.socket_manager import notify_colli_status_change
+        from src.infrastructure.security.audit_logger import log_audit_event, AuditEvent
+
+        colli_name = result.name if hasattr(result, 'name') else str(colli_id)
+        creator_id = result.creator_id if hasattr(result, 'creator_id') else None
+
+        if creator_id:
+            get_notification_service().notify_colli_rejected(
+                colli_id=colli_id,
+                colli_name=colli_name,
+                creator_id=creator_id,
+                reason=reason
+            )
+
+        notify_colli_status_change(str(colli_id), 'rejected', colli_name)
+        log_audit_event(AuditEvent.COLLI_REJECTED, str(admin_id), details={
+            "colli_id": str(colli_id), "colli_name": colli_name, "reason": reason
+        })
+    except Exception:
+        pass  # Ne pas bloquer le rejet si les notifications echouent
 
     return jsonify(result.to_dict()), HTTPStatus.OK

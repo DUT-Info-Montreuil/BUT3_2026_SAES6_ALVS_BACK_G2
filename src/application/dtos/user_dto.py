@@ -1,7 +1,9 @@
 # src/application/dtos/user_dto.py
 """Data Transfer Objects pour les utilisateurs."""
 
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass, asdict
+from typing import Optional
+from uuid import UUID
 
 from src.domain.identity.entities.user import User
 
@@ -32,7 +34,7 @@ class UserResponseDTO:
     role: str
     is_active: bool
     created_at: str
-
+    
     @classmethod
     def from_entity(cls, user: User) -> "UserResponseDTO":
         """Construit le DTO depuis une entité."""
@@ -45,7 +47,7 @@ class UserResponseDTO:
             is_active=user.is_active,
             created_at=user.created_at.isoformat()
         )
-
+    
     def to_dict(self) -> dict:
         """Convertit en dictionnaire."""
         return asdict(self)
@@ -58,7 +60,7 @@ class AuthTokensDTO:
     refresh_token: str
     token_type: str = "Bearer"
     expires_in: int = 3600
-
+    
     def to_dict(self) -> dict:
         """Convertit en dictionnaire."""
         return asdict(self)
@@ -69,7 +71,7 @@ class LoginResponseDTO:
     """DTO pour la réponse de connexion."""
     user: UserResponseDTO
     tokens: AuthTokensDTO
-
+    
     def to_dict(self) -> dict:
         """Convertit en dictionnaire."""
         return {

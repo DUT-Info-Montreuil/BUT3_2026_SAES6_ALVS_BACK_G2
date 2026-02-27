@@ -7,7 +7,7 @@ from enum import Enum
 class ColliStatus(Enum):
     """
     Statuts possibles d'un COLLI.
-
+    
     Workflow: PENDING → ACTIVE ou REJECTED
               ACTIVE → COMPLETED
     """
@@ -15,7 +15,7 @@ class ColliStatus(Enum):
     ACTIVE = "active"         # Approuvé et actif
     REJECTED = "rejected"     # Rejeté par l'admin
     COMPLETED = "completed"   # Terminé (fin de cycle)
-
+    
     def can_transition_to(self, target: "ColliStatus") -> bool:
         """Vérifie si la transition vers un autre statut est valide."""
         allowed_transitions = {

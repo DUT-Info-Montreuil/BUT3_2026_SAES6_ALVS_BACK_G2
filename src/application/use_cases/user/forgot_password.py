@@ -5,11 +5,18 @@ import secrets
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Optional
+from uuid import UUID
 
 from src.domain.identity.repositories.user_repository import IUserRepository
 
+
 # Storage in-memory pour les tokens de reset (en production: Redis)
 _reset_tokens: dict[str, dict] = {}
+
+# Rate limit par email: {email: [timestamp1, timestamp2, ...]}
+_email_rate_limit: dict[str, list] = {}
+_RATE_LIMIT_MAX = 3  # Max 3 demandes par heure
+_RATE_LIMIT_WINDOW = 3600  # 1 heure en secondes
 
 
 def _generate_reset_token() -> str:
@@ -37,15 +44,37 @@ class ForgotPasswordResult:
     reset_url: Optional[str] = None
 
 
+def _check_email_rate_limit(email: str) -> bool:
+    """Verifie si l'email n'a pas depasse la limite de demandes."""
+    now = datetime.utcnow()
+    cutoff = now - timedelta(seconds=_RATE_LIMIT_WINDOW)
+
+    if email in _email_rate_limit:
+        _email_rate_limit[email] = [
+            ts for ts in _email_rate_limit[email] if ts > cutoff
+        ]
+        if len(_email_rate_limit[email]) >= _RATE_LIMIT_MAX:
+            return False
+
+    return True
+
+
+def _record_email_request(email: str) -> None:
+    """Enregistre une demande de reset pour le rate limiting."""
+    if email not in _email_rate_limit:
+        _email_rate_limit[email] = []
+    _email_rate_limit[email].append(datetime.utcnow())
+
+
 class ForgotPasswordUseCase:
     """
     Genere un token de reinitialisation et envoie un email.
 
-    Le token expire apres 1 heure.
+    Le token expire apres 15 minutes.
     """
-
+    
     def __init__(
-        self,
+        self, 
         user_repository: IUserRepository,
         email_service = None,
         base_url: str = "http://localhost:3000"
@@ -53,9 +82,16 @@ class ForgotPasswordUseCase:
         self._user_repo = user_repository
         self._email_service = email_service
         self._base_url = base_url
-
+    
     def execute(self, command: ForgotPasswordCommand) -> ForgotPasswordResult:
         """Execute la demande de reinitialisation."""
+        
+        # Rate limit par email
+        if not _check_email_rate_limit(command.email):
+            return ForgotPasswordResult(
+                success=False,
+                message="Trop de demandes de reinitialisation. Veuillez reessayer plus tard."
+            )
 
         # Toujours retourner succes pour ne pas reveler si l'email existe
         user = self._user_repo.find_by_email(command.email)
@@ -67,10 +103,13 @@ class ForgotPasswordUseCase:
                 message="Si un compte existe avec cet email, un lien de reinitialisation a ete envoye."
             )
 
+        # Enregistrer la demande pour le rate limiting
+        _record_email_request(command.email)
+
         # Generer le token
         token = _generate_reset_token()
-        expires_at = datetime.utcnow() + timedelta(hours=1)
-
+        expires_at = datetime.utcnow() + timedelta(minutes=15)
+        
         # Stocker le token
         _reset_tokens[token] = {
             'user_id': str(user.id),
@@ -78,9 +117,9 @@ class ForgotPasswordUseCase:
             'expires_at': expires_at,
             'used': False
         }
-
+        
         reset_url = f"{self._base_url}/reset-password?token={token}"
-
+        
         # Envoyer l'email
         if self._email_service and self._email_service.is_enabled():
             self._email_service.send_password_reset(
@@ -88,7 +127,7 @@ class ForgotPasswordUseCase:
                 reset_token=token,
                 reset_url=reset_url
             )
-
+        
         return ForgotPasswordResult(
             success=True,
             message="Si un compte existe avec cet email, un lien de reinitialisation a ete envoye.",

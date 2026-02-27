@@ -7,12 +7,13 @@ from src.domain.collaboration.entities.colli import Colli
 from src.domain.collaboration.entities.membership import Membership
 from src.domain.collaboration.value_objects.colli_status import ColliStatus
 from src.domain.collaboration.value_objects.member_role import MemberRole
+from src.domain.collaboration.value_objects.membership_status import MembershipStatus
 from src.infrastructure.persistence.sqlalchemy.models.colli_model import ColliModel, MembershipModel
 
 
 class MembershipMapper:
     """Mapper pour Membership Entity ↔ MembershipModel."""
-
+    
     @staticmethod
     def to_entity(model: MembershipModel) -> Membership:
         """Convertit un modèle en entité."""
@@ -21,9 +22,10 @@ class MembershipMapper:
             user_id=model.user_id,
             colli_id=model.colli_id,
             role=MemberRole(model.role),
+            status=MembershipStatus(model.status),
             joined_at=model.joined_at
         )
-
+    
     @staticmethod
     def to_model(entity: Membership) -> MembershipModel:
         """Convertit une entité en modèle."""
@@ -32,6 +34,7 @@ class MembershipMapper:
             user_id=entity.user_id,
             colli_id=entity.colli_id,
             role=entity.role.value,
+            status=entity.status.value,
             joined_at=entity.joined_at
         )
 
@@ -39,19 +42,19 @@ class MembershipMapper:
 class ColliMapper:
     """
     Mapper bidirectionnel Colli Entity ↔ ColliModel ORM.
-
+    
     Gère également la conversion des Memberships imbriqués.
     """
-
+    
     @staticmethod
     def to_entity(model: ColliModel, include_members: bool = True) -> Colli:
         """
         Convertit un modèle ORM en entité du domaine.
-
+        
         Args:
             model: Le modèle ColliModel.
             include_members: Si True, inclut les membres.
-
+            
         Returns:
             Colli: L'entité du domaine avec ses membres.
         """
@@ -62,26 +65,27 @@ class ColliMapper:
             description=model.description,
             creator_id=model.creator_id,
             status=ColliStatus(model.status),
+            rejection_reason=model.rejection_reason,
             created_at=model.created_at,
             updated_at=model.updated_at
         )
-
+        
         # Charger les membres si demandé
         if include_members and model.members:
             colli._members = [
                 MembershipMapper.to_entity(m) for m in model.members
             ]
-
+        
         return colli
-
+    
     @staticmethod
     def to_model(entity: Colli) -> ColliModel:
         """
         Convertit une entité du domaine en modèle ORM.
-
+        
         Args:
             entity: L'entité Colli.
-
+            
         Returns:
             ColliModel: Le modèle ORM.
         """
@@ -92,26 +96,27 @@ class ColliMapper:
             description=entity.description,
             creator_id=entity.creator_id,
             status=entity.status.value,
+            rejection_reason=entity.rejection_reason,
             created_at=entity.created_at,
             updated_at=entity.updated_at
         )
-
+        
         # Convertir les membres
         model.members = [
             MembershipMapper.to_model(m) for m in entity.members
         ]
-
+        
         return model
-
+    
     @staticmethod
     def update_model(model: ColliModel, entity: Colli) -> ColliModel:
         """
         Met à jour un modèle existant.
-
+        
         Args:
             model: Le modèle ORM existant.
             entity: L'entité source.
-
+            
         Returns:
             ColliModel: Le modèle mis à jour.
         """
@@ -119,10 +124,12 @@ class ColliMapper:
         model.theme = entity.theme
         model.description = entity.description
         model.status = entity.status.value
+        model.rejection_reason = entity.rejection_reason
         model.updated_at = entity.updated_at
-
+        
         # Synchroniser les membres
         existing_member_ids = {m.id for m in model.members}
+        existing_members_map = {m.id: m for m in model.members}
         entity_member_ids = {m.id for m in entity.members}
 
         # Supprimer les membres retirés
@@ -130,13 +137,18 @@ class ColliMapper:
             m for m in model.members if m.id in entity_member_ids
         ]
 
-        # Ajouter les nouveaux membres
+        # Ajouter les nouveaux membres et mettre à jour les existants
         for member in entity.members:
             if member.id not in existing_member_ids:
                 model.members.append(MembershipMapper.to_model(member))
+            else:
+                # Mettre à jour le statut et le rôle des membres existants
+                existing_model = existing_members_map[member.id]
+                existing_model.status = member.status.value
+                existing_model.role = member.role.value
 
         return model
-
+    
     @staticmethod
     def to_entity_list(models: List[ColliModel]) -> List[Colli]:
         """Convertit une liste de modèles en entités."""

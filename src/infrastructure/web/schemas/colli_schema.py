@@ -1,7 +1,7 @@
 # src/infrastructure/web/schemas/colli_schema.py
 """Schémas de validation pour les Collis."""
 
-from marshmallow import Schema, fields, validate
+from marshmallow import Schema, fields, validate, post_load
 
 
 class CreateColliSchema(Schema):

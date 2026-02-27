@@ -99,18 +99,17 @@ class TestGetColliByIdUseCase:
     """Tests pour GetColliByIdUseCase."""
     
     def test_get_colli_success(self):
-        """Doit récupérer un COLLI existant (par son créateur)."""
+        """Doit récupérer un COLLI existant."""
         repo = InMemoryColliRepository()
         create_uc = CreateColliUseCase(repo)
         get_uc = GetColliByIdUseCase(repo)
-
-        creator_id = uuid4()
+        
         colli = create_uc.execute(CreateColliCommand(
-            name="Test", theme="Test", description=None, creator_id=creator_id
+            name="Test", theme="Test", description=None, creator_id=uuid4()
         ))
-
-        result = get_uc.execute(to_uuid(colli.id), creator_id)
-
+        
+        result = get_uc.execute(to_uuid(colli.id), uuid4())
+        
         assert result.id == colli.id
         assert result.name == "Test"
     

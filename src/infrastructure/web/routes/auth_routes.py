@@ -2,40 +2,31 @@
 """Routes d'authentification avec sécurité renforcée et documentation OpenAPI."""
 
 import os
-from http import HTTPStatus
-
-from dependency_injector.wiring import Provide, inject
-from flask import Blueprint, jsonify, make_response, request
+from flask import Blueprint, request, jsonify, make_response
 from flask_jwt_extended import (
-    create_access_token,
-    create_refresh_token,
-    get_jwt,
-    get_jwt_identity,
-    jwt_required,
-    set_refresh_cookies,
-    unset_jwt_cookies,
+    jwt_required, get_jwt_identity, get_jwt,
+    create_access_token, create_refresh_token,
+    set_refresh_cookies, unset_jwt_cookies
 )
+from http import HTTPStatus
+from uuid import UUID
 from marshmallow import ValidationError
+from dependency_injector.wiring import inject, Provide
 
-from src.application.exceptions import ForbiddenException, ValidationException
-from src.application.use_cases.user.authenticate_user import (
-    AuthenticateUserCommand,
-    AuthenticateUserUseCase,
-)
-from src.application.use_cases.user.get_current_user import GetCurrentUserUseCase
-from src.application.use_cases.user.register_user import RegisterUserCommand, RegisterUserUseCase
-from src.infrastructure.container import Container
-from src.infrastructure.security.account_lockout import get_lockout_service
-from src.infrastructure.security.audit_logger import (
-    log_account_locked,
-    log_login_failure,
-    log_login_success,
-    log_logout,
-)
-from src.infrastructure.web.app import get_redis_client
-from src.infrastructure.web.middlewares.auth_middleware import get_current_user_id, require_auth
-from src.infrastructure.web.middlewares.rate_limiter import limiter
 from src.infrastructure.web.schemas.auth_schema import LoginSchema, RegisterSchema
+from src.infrastructure.web.middlewares.auth_middleware import require_auth, get_current_user_id
+from src.infrastructure.web.middlewares.rate_limiter import limiter
+from src.application.exceptions import ValidationException, ForbiddenException
+from src.application.use_cases.user.register_user import RegisterUserUseCase, RegisterUserCommand
+from src.application.use_cases.user.authenticate_user import AuthenticateUserUseCase, AuthenticateUserCommand
+from src.application.use_cases.user.get_current_user import GetCurrentUserUseCase
+from src.infrastructure.container import Container
+from src.infrastructure.security.audit_logger import (
+    log_login_success, log_login_failure, log_logout, log_account_locked
+)
+from src.infrastructure.security.account_lockout import get_lockout_service
+from src.infrastructure.web.app import get_redis_client
+
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/v1/auth')
 
@@ -92,29 +83,29 @@ def login(
         $ref: '#/components/responses/RateLimited'
     """
     ip = _get_client_ip()
-
+    
     schema = LoginSchema()
     try:
         data = schema.load(request.get_json() or {})
     except ValidationError as err:
         raise ValidationException("Données invalides", errors=err.messages)
-
+    
     email = data['email']
     lockout = get_lockout_service()
-
+    
     if lockout.is_locked(email):
         log_account_locked(email, ip)
         raise ForbiddenException("Compte temporairement bloqué. Réessayez plus tard.")
-
+    
     try:
         result = use_case.execute(AuthenticateUserCommand(
             email=email,
             password=data['password']
         ))
-
+        
         lockout.clear_lockout(email)
         log_login_success(str(result.user.id), ip)
-
+        
         response = make_response(jsonify({
             'access_token': result.tokens.access_token,
             'token_type': 'Bearer',
@@ -122,23 +113,24 @@ def login(
         }))
         set_refresh_cookies(response, result.tokens.refresh_token)
         return response, HTTPStatus.OK
-
+        
     except Exception as e:
-        lockout.increment_failure(email)
+        attempts = lockout.increment_failure(email)
         remaining = lockout.get_remaining_attempts(email)
         log_login_failure(email, ip, str(e))
-
+        
         if remaining == 0:
             log_account_locked(email, ip)
-
+        
         raise
 
 
 @auth_bp.post('/register')
-@limiter.limit("3 per hour")
+@limiter.limit("20 per hour")
 @inject
 def register(
-    use_case: RegisterUserUseCase = Provide[Container.register_user_use_case]
+    use_case: RegisterUserUseCase = Provide[Container.register_user_use_case],
+    auth_use_case: AuthenticateUserUseCase = Provide[Container.authenticate_user_use_case]
 ):
     """
     Inscription utilisateur
@@ -177,13 +169,13 @@ def register(
         data = schema.load(request.get_json() or {})
     except ValidationError as err:
         raise ValidationException("Données invalides", errors=err.messages)
-
+    
     if data['password'] != data['password_confirm']:
         raise ValidationException(
             "Les mots de passe ne correspondent pas",
             errors={"password_confirm": ["Les mots de passe ne correspondent pas"]}
         )
-
+    
     result = use_case.execute(RegisterUserCommand(
         email=data['email'],
         password=data['password'],
@@ -191,7 +183,19 @@ def register(
         last_name=data['last_name']
     ))
 
-    return jsonify(result.to_dict()), HTTPStatus.CREATED
+    # Auto-login : générer les tokens JWT
+    auth_result = auth_use_case.execute(AuthenticateUserCommand(
+        email=data['email'],
+        password=data['password']
+    ))
+
+    response = make_response(jsonify({
+        'access_token': auth_result.tokens.access_token,
+        'token_type': 'Bearer',
+        'user': result.to_dict()
+    }))
+    set_refresh_cookies(response, auth_result.tokens.refresh_token)
+    return response, HTTPStatus.CREATED
 
 
 @auth_bp.post('/refresh')
@@ -230,12 +234,12 @@ def refresh_token():
     identity = get_jwt_identity()
     claims = get_jwt()
     old_jti = claims.get("jti")
-
+    
     redis_client = get_redis_client()
     if redis_client:
         ttl = 2592000
         redis_client.setex(f"revoked:{old_jti}", ttl, "revoked")
-
+    
     new_access_token = create_access_token(
         identity=identity,
         additional_claims={"role": claims.get("role", "member")}
@@ -244,7 +248,7 @@ def refresh_token():
         identity=identity,
         additional_claims={"role": claims.get("role", "member")}
     )
-
+    
     response = make_response(jsonify({
         'access_token': new_access_token,
         'token_type': 'Bearer'
@@ -283,14 +287,14 @@ def logout():
     identity = get_jwt_identity()
     claims = get_jwt()
     jti = claims.get("jti")
-
+    
     redis_client = get_redis_client()
     if redis_client:
         ttl = 2592000
         redis_client.setex(f"revoked:{jti}", ttl, "revoked")
-
+    
     log_logout(identity)
-
+    
     response = make_response(jsonify({'message': 'Déconnexion réussie'}))
     unset_jwt_cookies(response)
     return response, HTTPStatus.OK
@@ -322,7 +326,7 @@ def get_current_user(
     """
     user_id = get_current_user_id()
     result = use_case.execute(user_id)
-
+    
     return jsonify(result.to_dict()), HTTPStatus.OK
 
 
@@ -368,24 +372,24 @@ def update_profile(
       401:
         $ref: '#/components/responses/Unauthorized'
     """
-    from src.application.use_cases.user.update_profile import UpdateProfileCommand
     from src.infrastructure.web.schemas.auth_schema import UpdateProfileSchema
-
+    from src.application.use_cases.user.update_profile import UpdateProfileCommand
+    
     schema = UpdateProfileSchema()
     try:
         data = schema.load(request.get_json() or {})
     except ValidationError as err:
         raise ValidationException("Donnees invalides", errors=err.messages)
-
+    
     user_id = get_current_user_id()
-
+    
     result = use_case.execute(UpdateProfileCommand(
         user_id=user_id,
         first_name=data.get('first_name'),
         last_name=data.get('last_name'),
         avatar_url=data.get('avatar_url')
     ))
-
+    
     return jsonify(result.to_dict()), HTTPStatus.OK
 
 
@@ -437,24 +441,24 @@ def change_password(
       401:
         $ref: '#/components/responses/Unauthorized'
     """
-    from src.application.use_cases.user.change_password import ChangePasswordCommand
     from src.infrastructure.web.schemas.auth_schema import ChangePasswordSchema
-
+    from src.application.use_cases.user.change_password import ChangePasswordCommand
+    
     schema = ChangePasswordSchema()
     try:
         data = schema.load(request.get_json() or {})
     except ValidationError as err:
         raise ValidationException("Donnees invalides", errors=err.messages)
-
+    
     user_id = get_current_user_id()
-
+    
     use_case.execute(ChangePasswordCommand(
         user_id=user_id,
         current_password=data['current_password'],
         new_password=data['new_password'],
         new_password_confirm=data['new_password_confirm']
     ))
-
+    
     return jsonify({'message': 'Mot de passe modifie avec succes'}), HTTPStatus.OK
 
 
@@ -498,32 +502,31 @@ def forgot_password(
         $ref: '#/components/responses/ValidationError'
     """
     from src.application.use_cases.user.forgot_password import (
-        ForgotPasswordCommand,
-        ForgotPasswordUseCase,
+        ForgotPasswordUseCase, ForgotPasswordCommand
     )
     from src.infrastructure.services.email_service import get_email_service
-
+    
     data = request.get_json() or {}
     email = data.get('email', '').strip().lower()
-
+    
     if not email:
         raise ValidationException("Email requis", errors={"email": ["Champ requis"]})
-
+    
     use_case = ForgotPasswordUseCase(
         user_repository=user_repo,
         email_service=get_email_service(),
         base_url=os.getenv('FRONTEND_URL', 'http://localhost:3000')
     )
-
+    
     result = use_case.execute(ForgotPasswordCommand(email=email))
-
+    
     response = {'message': result.message}
-
+    
     # En dev: retourner le token pour faciliter les tests
     if os.getenv('FLASK_ENV') == 'development' and result.token:
         response['token'] = result.token
         response['reset_url'] = result.reset_url
-
+    
     return jsonify(response), HTTPStatus.OK
 
 
@@ -571,16 +574,15 @@ def reset_password(
         $ref: '#/components/responses/ValidationError'
     """
     from src.application.use_cases.user.reset_password import (
-        ResetPasswordCommand,
-        ResetPasswordUseCase,
+        ResetPasswordUseCase, ResetPasswordCommand
     )
-
+    
     data = request.get_json() or {}
-
+    
     token = data.get('token', '')
     new_password = data.get('new_password', '')
     confirm_password = data.get('confirm_password', '')
-
+    
     errors = {}
     if not token:
         errors['token'] = ["Token requis"]
@@ -588,16 +590,16 @@ def reset_password(
         errors['new_password'] = ["Nouveau mot de passe requis"]
     if not confirm_password:
         errors['confirm_password'] = ["Confirmation requise"]
-
+    
     if errors:
         raise ValidationException("Donnees invalides", errors=errors)
-
+    
     use_case = ResetPasswordUseCase(user_repository=user_repo)
-
+    
     result = use_case.execute(ResetPasswordCommand(
         token=token,
         new_password=new_password,
         confirm_password=confirm_password
     ))
-
+    
     return jsonify({'message': result.message}), HTTPStatus.OK

@@ -3,28 +3,28 @@
 
 from src.domain.identity.entities.user import User
 from src.domain.identity.value_objects.email import Email
-from src.domain.identity.value_objects.hashed_password import HashedPassword
 from src.domain.identity.value_objects.user_role import UserRole
+from src.domain.identity.value_objects.hashed_password import HashedPassword
 from src.infrastructure.persistence.sqlalchemy.models.user_model import UserModel
 
 
 class UserMapper:
     """
     Mapper bidirectionnel User Entity ↔ UserModel ORM.
-
+    
     Responsabilités:
     - Isolation du domaine de l'infrastructure
     - Conversion sans perte de données
     """
-
+    
     @staticmethod
     def to_entity(model: UserModel) -> User:
         """
         Convertit un modèle ORM en entité du domaine.
-
+        
         Args:
             model: Le modèle UserModel.
-
+            
         Returns:
             User: L'entité du domaine.
         """
@@ -40,15 +40,15 @@ class UserMapper:
             updated_at=model.updated_at,
             last_login_at=model.last_login_at
         )
-
+    
     @staticmethod
     def to_model(entity: User) -> UserModel:
         """
         Convertit une entité du domaine en modèle ORM.
-
+        
         Args:
             entity: L'entité User.
-
+            
         Returns:
             UserModel: Le modèle ORM.
         """
@@ -64,16 +64,16 @@ class UserMapper:
             updated_at=entity.updated_at,
             last_login_at=entity.last_login_at
         )
-
+    
     @staticmethod
     def update_model(model: UserModel, entity: User) -> UserModel:
         """
         Met à jour un modèle existant avec les données d'une entité.
-
+        
         Args:
             model: Le modèle ORM existant.
             entity: L'entité source.
-
+            
         Returns:
             UserModel: Le modèle mis à jour.
         """

@@ -2,10 +2,10 @@
 """Rate limiting pour protéger contre les attaques par force brute."""
 
 import os
-
 from flask import Flask
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+
 
 # Instance globale du limiter
 limiter = Limiter(

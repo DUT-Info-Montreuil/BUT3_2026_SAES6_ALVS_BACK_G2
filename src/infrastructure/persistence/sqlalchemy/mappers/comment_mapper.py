@@ -9,7 +9,7 @@ class CommentMapper:
     """
     Mapper bidirectionnel Comment Entity ↔ CommentModel ORM.
     """
-
+    
     @staticmethod
     def to_entity(model: CommentModel) -> Comment:
         """
@@ -39,7 +39,7 @@ class CommentMapper:
             created_at=entity.created_at,
             updated_at=entity.updated_at
         )
-
+    
     @staticmethod
     def update_model(model: CommentModel, entity: Comment) -> CommentModel:
         """

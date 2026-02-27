@@ -6,6 +6,7 @@ from datetime import datetime
 from uuid import UUID, uuid4
 
 from src.domain.collaboration.value_objects.member_role import MemberRole
+from src.domain.collaboration.value_objects.membership_status import MembershipStatus
 
 
 @dataclass
@@ -19,6 +20,7 @@ class Membership:
     user_id: UUID
     colli_id: UUID
     role: MemberRole
+    status: MembershipStatus = MembershipStatus.PENDING
     joined_at: datetime = field(default_factory=datetime.utcnow)
 
     @classmethod
@@ -26,15 +28,35 @@ class Membership:
         cls,
         user_id: UUID,
         colli_id: UUID,
-        role: MemberRole = MemberRole.MEMBER
+        role: MemberRole = MemberRole.MEMBER,
+        status: MembershipStatus = MembershipStatus.PENDING
     ) -> "Membership":
         """Factory method pour créer une nouvelle appartenance."""
         return cls(
             id=uuid4(),
             user_id=user_id,
             colli_id=colli_id,
-            role=role
+            role=role,
+            status=status
         )
+
+    def accept(self) -> None:
+        """Accepte la demande d'adhésion."""
+        self.status = MembershipStatus.ACCEPTED
+
+    def reject(self) -> None:
+        """Rejette la demande d'adhésion."""
+        self.status = MembershipStatus.REJECTED
+
+    @property
+    def is_accepted(self) -> bool:
+        """Vérifie si le membre est accepté."""
+        return self.status == MembershipStatus.ACCEPTED
+
+    @property
+    def is_pending(self) -> bool:
+        """Vérifie si la demande est en attente."""
+        return self.status == MembershipStatus.PENDING
 
     def promote_to(self, new_role: MemberRole) -> None:
         """

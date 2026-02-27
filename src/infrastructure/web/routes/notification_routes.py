@@ -1,15 +1,15 @@
 # src/infrastructure/web/routes/notification_routes.py
 """Routes pour les notifications avec documentation OpenAPI."""
 
+from flask import Blueprint, request, jsonify
 from http import HTTPStatus
 from uuid import UUID
+from dependency_injector.wiring import inject, Provide
 
-from dependency_injector.wiring import Provide, inject
-from flask import Blueprint, jsonify, request
-
-from src.application.exceptions import ForbiddenException, NotFoundException
+from src.infrastructure.web.middlewares.auth_middleware import require_auth, get_current_user_id
+from src.application.exceptions import NotFoundException, ForbiddenException
 from src.infrastructure.container import Container
-from src.infrastructure.web.middlewares.auth_middleware import get_current_user_id, require_auth
+
 
 notification_bp = Blueprint('notifications', __name__, url_prefix='/api/v1/notifications')
 
@@ -75,10 +75,10 @@ def list_notifications(
     user_id = get_current_user_id()
     unread_only = request.args.get('unread_only', 'false').lower() == 'true'
     limit = min(request.args.get('limit', 50, type=int), 100)
-
+    
     notifications = notification_repo.find_by_user(user_id, unread_only, limit)
     unread_count = notification_repo.count_unread(user_id)
-
+    
     return jsonify({
         'items': [n.to_dict() for n in notifications],
         'unread_count': unread_count
@@ -114,7 +114,7 @@ def get_unread_count(
     """
     user_id = get_current_user_id()
     count = notification_repo.count_unread(user_id)
-
+    
     return jsonify({'unread_count': count}), HTTPStatus.OK
 
 
@@ -159,15 +159,15 @@ def mark_as_read(
     """
     user_id = get_current_user_id()
     notification = notification_repo.find_by_id(notification_id)
-
+    
     if not notification:
         raise NotFoundException(f"Notification {notification_id} non trouvee")
-
+    
     if notification.user_id != user_id:
         raise ForbiddenException("Cette notification ne vous appartient pas")
-
+    
     notification_repo.mark_as_read(notification_id)
-
+    
     return jsonify({'message': 'Notification marquee comme lue'}), HTTPStatus.OK
 
 
@@ -200,7 +200,7 @@ def mark_all_as_read(
     """
     user_id = get_current_user_id()
     count = notification_repo.mark_all_as_read(user_id)
-
+    
     return jsonify({'marked_count': count}), HTTPStatus.OK
 
 
@@ -238,13 +238,13 @@ def delete_notification(
     """
     user_id = get_current_user_id()
     notification = notification_repo.find_by_id(notification_id)
-
+    
     if not notification:
         raise NotFoundException(f"Notification {notification_id} non trouvee")
-
+    
     if notification.user_id != user_id:
         raise ForbiddenException("Cette notification ne vous appartient pas")
-
+    
     notification_repo.delete(notification_id)
-
+    
     return '', HTTPStatus.NO_CONTENT

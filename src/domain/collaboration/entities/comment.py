@@ -7,6 +7,7 @@ Un Comment est une réponse d'un membre à une Letter dans un COLLI.
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Optional
 from uuid import UUID, uuid4
 
 from src.domain.shared.domain_exception import DomainException
@@ -26,7 +27,7 @@ class CannotEditCommentException(DomainException):
 class Comment:
     """
     Entity pour les commentaires.
-
+    
     Invariants:
     - Le contenu ne peut pas être vide
     - Seul l'auteur peut modifier son commentaire
@@ -35,15 +36,17 @@ class Comment:
     letter_id: UUID
     sender_id: UUID
     content: str
+    parent_comment_id: Optional[UUID] = None
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
-
+    
     @classmethod
     def create(
         cls,
         letter_id: UUID,
         sender_id: UUID,
-        content: str
+        content: str,
+        parent_comment_id: Optional[UUID] = None
     ) -> "Comment":
         """
         Factory pour créer un commentaire.
@@ -52,6 +55,7 @@ class Comment:
             letter_id: ID de la lettre parente.
             sender_id: ID de l'utilisateur qui commente.
             content: Contenu du commentaire.
+            parent_comment_id: ID du commentaire parent (pour le threading).
 
         Returns:
             Comment: Nouveau commentaire.
@@ -70,17 +74,18 @@ class Comment:
             id=uuid4(),
             letter_id=letter_id,
             sender_id=sender_id,
-            content=content.strip()
+            content=content.strip(),
+            parent_comment_id=parent_comment_id
         )
-
+    
     def update_content(self, new_content: str, editor_id: UUID) -> None:
         """
         Met à jour le contenu du commentaire.
-
+        
         Args:
             new_content: Nouveau contenu.
             editor_id: ID de l'utilisateur qui modifie.
-
+            
         Raises:
             CannotEditCommentException: Si l'utilisateur n'est pas l'auteur.
         """
@@ -88,37 +93,37 @@ class Comment:
             raise CannotEditCommentException(
                 "Seul l'auteur peut modifier son commentaire"
             )
-
+        
         if not new_content or len(new_content.strip()) < 1:
             raise CommentValidationException(
                 "Le contenu du commentaire est obligatoire"
             )
-
+        
         self.content = new_content.strip()
         self._touch()
-
+    
     def can_user_edit(self, user_id: UUID) -> bool:
         """Vérifie si l'utilisateur peut modifier le commentaire."""
         return user_id == self.sender_id
-
+    
     def can_user_delete(self, user_id: UUID, is_moderator: bool = False) -> bool:
         """
         Vérifie si l'utilisateur peut supprimer le commentaire.
-
+        
         Un utilisateur peut supprimer si:
         - Il est l'auteur du commentaire
         - Il est modérateur du COLLI
         """
         return user_id == self.sender_id or is_moderator
-
+    
     def _touch(self) -> None:
         """Met à jour updated_at."""
         self.updated_at = datetime.utcnow()
-
+    
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Comment):
             return False
         return self.id == other.id
-
+    
     def __hash__(self) -> int:
         return hash(self.id)

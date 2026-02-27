@@ -124,15 +124,15 @@ class TestDevelopmentConfig:
         """Test DevelopmentConfig sans variables d'environnement (fallback)."""
         mock_token.return_value = "generated-secret-32-characters-long"
         
-        with patch('src.infrastructure.config.settings.logger') as mock_logger:
+        with patch('builtins.print') as mock_print:
             config = DevelopmentConfig()
-
+        
         assert config.SECRET_KEY == "generated-secret-32-characters-long"
         assert config.JWT_SECRET_KEY == "generated-secret-32-characters-long"
-
+        
         # Vérifier les messages d'avertissement
-        mock_logger.warning.assert_any_call("SECRET_KEY generee automatiquement (dev uniquement)")
-        mock_logger.warning.assert_any_call("JWT_SECRET_KEY generee automatiquement (dev uniquement)")
+        mock_print.assert_any_call("⚠️  SECRET_KEY generee automatiquement (dev uniquement)")
+        mock_print.assert_any_call("⚠️  JWT_SECRET_KEY generee automatiquement (dev uniquement)")
     
     @patch.dict(os.environ, {"SECRET_KEY": "short"}, clear=True)
     def test_development_config_short_secret_key(self):

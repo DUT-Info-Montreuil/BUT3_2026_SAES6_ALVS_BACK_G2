@@ -1,25 +1,27 @@
 # src/infrastructure/web/routes/comment_routes.py
 """Routes pour les Comments avec documentation OpenAPI."""
 
+from flask import Blueprint, request, jsonify
 from http import HTTPStatus
 from uuid import UUID
+from typing import Optional
+from dependency_injector.wiring import inject, Provide
+from flask_jwt_extended import jwt_required, get_jwt_identity
 
-from dependency_injector.wiring import Provide, inject
-from flask import Blueprint, jsonify, request
-from flask_jwt_extended import get_jwt_identity, jwt_required
-
-from src.application.dtos.comment_dto import CreateCommentCommand
+from src.infrastructure.web.middlewares.auth_middleware import require_auth, get_current_user_id
 from src.application.exceptions import ValidationException
+from src.application.dtos.comment_dto import CreateCommentCommand
 from src.application.use_cases.comment.create_comment import CreateCommentUseCase
-from src.application.use_cases.comment.delete_comment import DeleteCommentUseCase
 from src.application.use_cases.comment.get_comments import GetCommentsForLetterUseCase
+from src.application.use_cases.comment.delete_comment import DeleteCommentUseCase
 from src.infrastructure.container import Container
+
 
 comment_bp = Blueprint('comments', __name__, url_prefix='/api/v1/letters/<uuid:letter_id>/comments')
 
 
 @comment_bp.post('')
-@jwt_required()
+@require_auth
 @inject
 def create_comment(
     letter_id: UUID,
@@ -66,22 +68,30 @@ def create_comment(
         $ref: '#/components/responses/NotFound'
     """
     data = request.get_json() or {}
-    sender_id = get_jwt_identity()
-
+    sender_id = get_current_user_id()
+    
     if not data.get('content'):
         raise ValidationException("Le contenu est obligatoire")
+
+    parent_comment_id = None
+    if data.get('parent_comment_id'):
+        try:
+            parent_comment_id = UUID(data['parent_comment_id'])
+        except ValueError:
+            raise ValidationException("parent_comment_id invalide")
 
     result = use_case.execute(CreateCommentCommand(
         letter_id=letter_id,
         sender_id=sender_id,
-        content=data['content']
+        content=data['content'],
+        parent_comment_id=parent_comment_id
     ))
-
+    
     return jsonify(result.to_dict()), HTTPStatus.CREATED
 
 
 @comment_bp.get('')
-@jwt_required()
+@require_auth
 @inject
 def list_comments(
     letter_id: UUID,
@@ -132,16 +142,16 @@ def list_comments(
       404:
         $ref: '#/components/responses/NotFound'
     """
-    user_id = get_jwt_identity()
+    user_id = get_current_user_id()
     page = request.args.get('page', 1, type=int)
     per_page = min(request.args.get('per_page', 50, type=int), 100)
-
+    
     result = use_case.execute(letter_id, user_id, page, per_page)
     return jsonify(result.to_dict()), HTTPStatus.OK
 
 
 @comment_bp.delete('/<uuid:comment_id>')
-@jwt_required()
+@require_auth
 @inject
 def delete_comment(
     letter_id: UUID,
@@ -179,13 +189,13 @@ def delete_comment(
       404:
         $ref: '#/components/responses/NotFound'
     """
-    user_id = get_jwt_identity()
+    user_id = get_current_user_id()
     use_case.execute(comment_id, user_id)
     return '', HTTPStatus.NO_CONTENT
 
 
 @comment_bp.patch('/<uuid:comment_id>')
-@jwt_required()
+@require_auth
 @inject
 def update_comment(
     letter_id: UUID,
@@ -239,21 +249,21 @@ def update_comment(
       404:
         $ref: '#/components/responses/NotFound'
     """
-    from src.application.exceptions import ValidationException
     from src.application.use_cases.comment.update_comment import UpdateCommentCommand
-
+    from src.application.exceptions import ValidationException
+    
     data = request.get_json() or {}
     content = data.get('content')
-
+    
     if not content:
         raise ValidationException("Le contenu est requis", errors={"content": ["Champ requis"]})
-
-    user_id = get_jwt_identity()
-
+    
+    user_id = get_current_user_id()
+    
     result = use_case.execute(UpdateCommentCommand(
         comment_id=comment_id,
         user_id=user_id,
         content=content
     ))
-
+    
     return jsonify(result.to_dict()), HTTPStatus.OK

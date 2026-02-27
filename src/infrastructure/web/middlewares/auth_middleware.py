@@ -2,14 +2,27 @@
 """Middleware d'authentification et d'autorisation."""
 
 from functools import wraps
-from typing import Callable, List
+from typing import List, Callable
+from flask import request, g, current_app
+from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity, get_jwt
 from uuid import UUID
 
-from flask import current_app, g
-from flask_jwt_extended import get_jwt, get_jwt_identity, verify_jwt_in_request
-
-from src.application.exceptions import ForbiddenException, UnauthorizedException
 from src.domain.identity.value_objects.user_role import UserRole
+from src.application.exceptions import UnauthorizedException, ForbiddenException
+
+
+def _check_user_active(user_id: UUID) -> None:
+    """
+    Vérifie que l'utilisateur est toujours actif (non banni).
+
+    Raises:
+        ForbiddenException: Si l'utilisateur est désactivé.
+    """
+    from src.infrastructure.container import Container
+    user_repo = Container.user_repository()
+    user = user_repo.find_by_id(user_id)
+    if user and not user.is_active:
+        raise ForbiddenException("Votre compte a été désactivé")
 
 
 def require_auth(fn: Callable) -> Callable:
@@ -18,6 +31,7 @@ def require_auth(fn: Callable) -> Callable:
 
     Extrait automatiquement le user_id du token et le place dans g.current_user_id.
     JAMAIS depuis le body de la requête.
+    Vérifie également que l'utilisateur est toujours actif (non banni).
     """
     @wraps(fn)
     def wrapper(*args, **kwargs):
@@ -29,7 +43,7 @@ def require_auth(fn: Callable) -> Callable:
                 current_app.config['JWT_HEADER_TYPE'] = 'Bearer'
 
             verify_jwt_in_request()
-        except Exception:
+        except Exception as e:
             raise UnauthorizedException("Token d'authentification invalide ou manquant")
 
         # Extraire l'identité depuis le JWT (JAMAIS depuis le body)
@@ -37,8 +51,12 @@ def require_auth(fn: Callable) -> Callable:
         if not identity:
             raise UnauthorizedException("Token invalide: identité manquante")
 
+        # Vérifier que l'utilisateur est toujours actif
+        user_id = UUID(identity)
+        _check_user_active(user_id)
+
         # Stocker dans le contexte Flask pour accès ultérieur
-        g.current_user_id = UUID(identity)
+        g.current_user_id = user_id
         g.current_user_role = get_jwt().get("role", "member")
 
         return fn(*args, **kwargs)
@@ -49,16 +67,16 @@ def require_auth(fn: Callable) -> Callable:
 def require_role(allowed_roles: List[UserRole]) -> Callable:
     """
     Décorateur factory qui vérifie le rôle de l'utilisateur.
-
+    
     Usage:
         @colli_bp.post('')
         @require_role([UserRole.TEACHER, UserRole.ADMIN])
         def create_colli():
             ...
-
+    
     Args:
         allowed_roles: Liste des rôles autorisés.
-
+        
     Returns:
         Callable: Le décorateur configuré.
     """
@@ -82,6 +100,10 @@ def require_role(allowed_roles: List[UserRole]) -> Callable:
             claims = get_jwt()
             user_role_str = claims.get("role", "member")
 
+            # Vérifier que l'utilisateur est toujours actif
+            user_id = UUID(identity)
+            _check_user_active(user_id)
+
             # Convertir en enum et vérifier
             try:
                 user_role = UserRole(user_role_str)
@@ -96,7 +118,7 @@ def require_role(allowed_roles: List[UserRole]) -> Callable:
                 )
 
             # Stocker dans le contexte
-            g.current_user_id = UUID(identity)
+            g.current_user_id = user_id
             g.current_user_role = user_role
 
             return fn(*args, **kwargs)
@@ -109,12 +131,12 @@ def require_role(allowed_roles: List[UserRole]) -> Callable:
 def get_current_user_id() -> UUID:
     """
     Récupère l'ID de l'utilisateur courant depuis le contexte Flask.
-
+    
     À utiliser UNIQUEMENT après un décorateur @require_auth ou @require_role.
-
+    
     Returns:
         UUID: L'ID de l'utilisateur authentifié.
-
+        
     Raises:
         RuntimeError: Si appelé hors contexte authentifié.
     """
@@ -127,7 +149,7 @@ def get_current_user_id() -> UUID:
 def get_current_user_role() -> UserRole:
     """
     Récupère le rôle de l'utilisateur courant depuis le contexte Flask.
-
+    
     Returns:
         UserRole: Le rôle de l'utilisateur.
     """

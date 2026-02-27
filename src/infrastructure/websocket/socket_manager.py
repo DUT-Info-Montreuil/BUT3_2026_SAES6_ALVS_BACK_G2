@@ -1,13 +1,13 @@
 # src/infrastructure/websocket/socket_manager.py
 """Gestionnaire de WebSocket avec Flask-SocketIO."""
 
-import logging
 import os
-from typing import Dict, Optional, Set
-
-from flask import request
+from flask_socketio import SocketIO, emit, join_room, leave_room, disconnect
 from flask_jwt_extended import decode_token
-from flask_socketio import SocketIO, emit, join_room, leave_room
+from flask import request
+from typing import Dict, Optional, Set
+from uuid import UUID
+import logging
 
 logger = logging.getLogger(__name__)
 
@@ -21,19 +21,19 @@ _connected_users: Dict[str, Set[str]] = {}
 def init_socketio(app) -> SocketIO:
     """
     Initialise Flask-SocketIO avec l'application Flask.
-
+    
     Args:
         app: Application Flask
-
+        
     Returns:
         Instance SocketIO configuree
     """
     global socketio
-
+    
     # Configuration CORS avec origines restreintes
     cors_origin = os.getenv('CORS_ORIGIN', 'http://localhost:5173')
     cors_origins = [origin.strip() for origin in cors_origin.split(',')]
-
+    
     socketio = SocketIO(
         app,
         cors_allowed_origins=cors_origins,
@@ -41,10 +41,10 @@ def init_socketio(app) -> SocketIO:
         logger=True,
         engineio_logger=True
     )
-
+    
     # Enregistrer les handlers
     register_handlers(socketio)
-
+    
     logger.info("Flask-SocketIO initialise")
     return socketio
 
@@ -56,49 +56,49 @@ def get_socketio() -> Optional[SocketIO]:
 
 def register_handlers(sio: SocketIO):
     """Enregistre les handlers d'evenements WebSocket."""
-
+    
     @sio.on('connect')
     def handle_connect(auth=None):
         """Gere la connexion d'un client."""
         logger.info(f"Client connecte: {request.sid}")
-
+        
         # Verifier l'authentification
         token = None
         if auth and isinstance(auth, dict):
             token = auth.get('token')
-
+        
         if not token:
             # Essayer dans les headers
             token = request.headers.get('Authorization', '').replace('Bearer ', '')
-
+        
         if token:
             try:
                 decoded = decode_token(token)
                 user_id = decoded['sub']
-
+                
                 # Ajouter a la room de l'utilisateur
                 join_room(f"user_{user_id}")
-
+                
                 # Tracker la connexion
                 if user_id not in _connected_users:
                     _connected_users[user_id] = set()
                 _connected_users[user_id].add(request.sid)
-
+                
                 logger.info(f"Utilisateur {user_id} authentifie via WebSocket")
                 emit('authenticated', {'user_id': user_id})
-
+                
             except Exception as e:
                 logger.warning(f"Token WebSocket invalide: {e}")
                 emit('error', {'message': 'Token invalide'})
         else:
             # Connexion anonyme (pour certains usages publics)
             emit('connected', {'message': 'Connexion etablie (non authentifiee)'})
-
+    
     @sio.on('disconnect')
     def handle_disconnect():
         """Gere la deconnexion d'un client."""
         logger.info(f"Client deconnecte: {request.sid}")
-
+        
         # Nettoyer le tracking
         for user_id, sessions in list(_connected_users.items()):
             if request.sid in sessions:
@@ -106,7 +106,7 @@ def register_handlers(sio: SocketIO):
                 if not sessions:
                     del _connected_users[user_id]
                 break
-
+    
     @sio.on('join_colli')
     def handle_join_colli(data):
         """Rejoindre la room d'un COLLI pour recevoir les updates."""
@@ -115,7 +115,7 @@ def register_handlers(sio: SocketIO):
             join_room(f"colli_{colli_id}")
             emit('joined_colli', {'colli_id': colli_id})
             logger.info(f"Client {request.sid} rejoint le COLLI {colli_id}")
-
+    
     @sio.on('leave_colli')
     def handle_leave_colli(data):
         """Quitter la room d'un COLLI."""
@@ -123,7 +123,7 @@ def register_handlers(sio: SocketIO):
         if colli_id:
             leave_room(f"colli_{colli_id}")
             emit('left_colli', {'colli_id': colli_id})
-
+    
     @sio.on('ping')
     def handle_ping():
         """Ping pour keepalive."""
@@ -147,7 +147,7 @@ def get_online_users() -> list:
 def emit_to_user(user_id: str, event: str, data: dict):
     """
     Emet un evenement a un utilisateur specifique.
-
+    
     Args:
         user_id: ID de l'utilisateur
         event: Nom de l'evenement
@@ -161,7 +161,7 @@ def emit_to_user(user_id: str, event: str, data: dict):
 def emit_to_colli(colli_id: str, event: str, data: dict, skip_sid: str = None):
     """
     Emet un evenement a tous les membres d'un COLLI.
-
+    
     Args:
         colli_id: ID du COLLI
         event: Nom de l'evenement
@@ -176,7 +176,7 @@ def emit_to_colli(colli_id: str, event: str, data: dict, skip_sid: str = None):
 def broadcast(event: str, data: dict):
     """
     Emet un evenement a tous les clients connectes.
-
+    
     Args:
         event: Nom de l'evenement
         data: Donnees a envoyer
@@ -231,7 +231,7 @@ def notify_user_joined_colli(colli_id: str, user_data: dict):
 def push_notification(user_id: str, notification_data: dict):
     """
     Envoie une notification push a un utilisateur.
-
+    
     Args:
         user_id: ID de l'utilisateur cible
         notification_data: Contenu de la notification

@@ -12,16 +12,17 @@ from datetime import datetime
 from typing import List, Optional
 from uuid import UUID, uuid4
 
-from src.domain.collaboration.entities.membership import Membership
-from src.domain.collaboration.events import (
-    ColliApproved,
-    ColliRejected,
-    DomainEvent,
-    MemberAdded,
-    MemberRemoved,
-)
 from src.domain.collaboration.value_objects.colli_status import ColliStatus
 from src.domain.collaboration.value_objects.member_role import MemberRole
+from src.domain.collaboration.value_objects.membership_status import MembershipStatus
+from src.domain.collaboration.entities.membership import Membership
+from src.domain.collaboration.events import (
+    DomainEvent,
+    ColliApproved,
+    ColliRejected,
+    MemberAdded,
+    MemberRemoved
+)
 from src.domain.shared.domain_exception import DomainException
 
 
@@ -52,9 +53,9 @@ class Colli:
 
     Invariants métier protégés :
     - Un COLLI ne peut être approuvé que si son statut est PENDING
-    - Un utilisateur ne peut être membre qu'une seule fois
-    - L'approbation crée automatiquement le créateur comme MANAGER
-    - Les lettres ne peuvent être créées que dans un COLLI actif
+    - Un utilisateur ne peut avoir qu'une seule adhésion (quel que soit le statut)
+    - L'approbation crée automatiquement le créateur comme MANAGER (ACCEPTED)
+    - Les lettres ne peuvent être créées que dans un COLLI actif par un membre ACCEPTED
     """
     id: UUID
     name: str
@@ -62,6 +63,7 @@ class Colli:
     description: Optional[str]
     creator_id: UUID
     status: ColliStatus = ColliStatus.PENDING
+    rejection_reason: Optional[str] = None
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
 
@@ -129,8 +131,8 @@ class Colli:
         self.status = ColliStatus.ACTIVE
         self._touch()
 
-        # Ajouter le créateur comme manager
-        self._add_member_internal(self.creator_id, MemberRole.MANAGER)
+        # Ajouter le créateur comme manager (directement ACCEPTED)
+        self._add_member_internal(self.creator_id, MemberRole.MANAGER, MembershipStatus.ACCEPTED)
 
         # Émettre l'événement
         self._domain_events.append(ColliApproved(colli_id=self.id, approved_by=approved_by))
@@ -152,6 +154,7 @@ class Colli:
             )
 
         self.status = ColliStatus.REJECTED
+        self.rejection_reason = reason
         self._touch()
 
         self._domain_events.append(ColliRejected(
@@ -185,7 +188,7 @@ class Colli:
         role: MemberRole = MemberRole.MEMBER
     ) -> Membership:
         """
-        Ajoute un membre au COLLI.
+        Ajoute un membre au COLLI (en statut PENDING par défaut).
 
         Args:
             user_id: ID de l'utilisateur à ajouter.
@@ -196,23 +199,29 @@ class Colli:
 
         Raises:
             InactiveColliException: Si le COLLI n'est pas actif.
-            UserAlreadyMemberException: Si l'utilisateur est déjà membre.
+            UserAlreadyMemberException: Si l'utilisateur a déjà une adhésion.
         """
         self._ensure_active()
 
-        if self.is_member(user_id):
+        if self.has_membership(user_id):
             raise UserAlreadyMemberException(
-                f"L'utilisateur {user_id} est déjà membre du COLLI {self.id}"
+                f"L'utilisateur {user_id} a déjà une adhésion au COLLI {self.id}"
             )
 
-        return self._add_member_internal(user_id, role)
+        return self._add_member_internal(user_id, role, MembershipStatus.PENDING)
 
-    def _add_member_internal(self, user_id: UUID, role: MemberRole) -> Membership:
+    def _add_member_internal(
+        self,
+        user_id: UUID,
+        role: MemberRole,
+        status: MembershipStatus = MembershipStatus.PENDING
+    ) -> Membership:
         """Méthode interne pour ajouter un membre (bypass des vérifications)."""
         membership = Membership.create(
             user_id=user_id,
             colli_id=self.id,
-            role=role
+            role=role,
+            status=status
         )
         self._members.append(membership)
         self._domain_events.append(MemberAdded(
@@ -222,6 +231,52 @@ class Colli:
         ))
         self._touch()
         return membership
+
+    def accept_member(self, user_id: UUID) -> None:
+        """
+        Accepte la demande d'adhésion d'un utilisateur.
+
+        Args:
+            user_id: ID de l'utilisateur dont la demande est acceptée.
+
+        Raises:
+            UserNotMemberException: Si l'utilisateur n'a pas de demande.
+            DomainException: Si la demande n'est pas en attente.
+        """
+        membership = self._get_membership(user_id)
+        if not membership:
+            raise UserNotMemberException(
+                f"L'utilisateur {user_id} n'a pas de demande d'adhésion au COLLI {self.id}"
+            )
+        if not membership.is_pending:
+            raise DomainException(
+                f"La demande de l'utilisateur {user_id} n'est pas en attente"
+            )
+        membership.accept()
+        self._touch()
+
+    def reject_member(self, user_id: UUID) -> None:
+        """
+        Rejette la demande d'adhésion d'un utilisateur.
+
+        Args:
+            user_id: ID de l'utilisateur dont la demande est rejetée.
+
+        Raises:
+            UserNotMemberException: Si l'utilisateur n'a pas de demande.
+            DomainException: Si la demande n'est pas en attente.
+        """
+        membership = self._get_membership(user_id)
+        if not membership:
+            raise UserNotMemberException(
+                f"L'utilisateur {user_id} n'a pas de demande d'adhésion au COLLI {self.id}"
+            )
+        if not membership.is_pending:
+            raise DomainException(
+                f"La demande de l'utilisateur {user_id} n'est pas en attente"
+            )
+        membership.reject()
+        self._touch()
 
     def remove_member(self, user_id: UUID) -> None:
         """
@@ -233,7 +288,7 @@ class Colli:
         Raises:
             UserNotMemberException: Si l'utilisateur n'est pas membre.
         """
-        membership = self.get_member(user_id)
+        membership = self._get_membership(user_id)
         if not membership:
             raise UserNotMemberException(
                 f"L'utilisateur {user_id} n'est pas membre du COLLI {self.id}"
@@ -252,12 +307,12 @@ class Colli:
             new_role: Nouveau rôle à attribuer.
 
         Raises:
-            UserNotMemberException: Si l'utilisateur n'est pas membre.
+            UserNotMemberException: Si l'utilisateur n'est pas membre accepté.
         """
         membership = self.get_member(user_id)
         if not membership:
             raise UserNotMemberException(
-                f"L'utilisateur {user_id} n'est pas membre du COLLI {self.id}"
+                f"L'utilisateur {user_id} n'est pas membre accepté du COLLI {self.id}"
             )
 
         membership.promote_to(new_role)
@@ -268,16 +323,39 @@ class Colli:
     # =========================================================================
 
     def is_member(self, user_id: UUID) -> bool:
-        """Vérifie si un utilisateur est membre."""
+        """Vérifie si un utilisateur est membre ACCEPTED ou créateur."""
+        if self.creator_id == user_id:
+            return True
+        return any(
+            m.user_id == user_id and m.is_accepted
+            for m in self._members
+        )
+
+    def is_pending_member(self, user_id: UUID) -> bool:
+        """Vérifie si un utilisateur a une demande en attente."""
+        return any(
+            m.user_id == user_id and m.is_pending
+            for m in self._members
+        )
+
+    def has_membership(self, user_id: UUID) -> bool:
+        """Vérifie si un utilisateur a une adhésion (quel que soit le statut)."""
         return any(m.user_id == user_id for m in self._members)
 
     def is_manager(self, user_id: UUID) -> bool:
-        """Vérifie si un utilisateur est manager."""
+        """Vérifie si un utilisateur est manager (et accepté)."""
         member = self.get_member(user_id)
         return member is not None and member.role == MemberRole.MANAGER
 
     def get_member(self, user_id: UUID) -> Optional[Membership]:
-        """Récupère l'appartenance d'un utilisateur."""
+        """Récupère l'appartenance d'un utilisateur ACCEPTED."""
+        return next(
+            (m for m in self._members if m.user_id == user_id and m.is_accepted),
+            None
+        )
+
+    def _get_membership(self, user_id: UUID) -> Optional[Membership]:
+        """Récupère l'adhésion d'un utilisateur (quel que soit le statut)."""
         return next((m for m in self._members if m.user_id == user_id), None)
 
     def can_user_write(self, user_id: UUID) -> bool:
@@ -288,7 +366,7 @@ class Colli:
 
     def get_managers(self) -> List[Membership]:
         """Retourne la liste des managers du COLLI."""
-        return [m for m in self._members if m.role == MemberRole.MANAGER]
+        return [m for m in self._members if m.role == MemberRole.MANAGER and m.is_accepted]
 
     @property
     def is_active(self) -> bool:
@@ -302,13 +380,23 @@ class Colli:
 
     @property
     def member_count(self) -> int:
-        """Retourne le nombre de membres."""
-        return len(self._members)
+        """Retourne le nombre de membres ACCEPTED."""
+        return sum(1 for m in self._members if m.is_accepted)
 
     @property
     def members(self) -> List[Membership]:
-        """Retourne une copie de la liste des membres (immutabilité)."""
+        """Retourne une copie de la liste de toutes les adhésions (immutabilité)."""
         return self._members.copy()
+
+    @property
+    def accepted_members(self) -> List[Membership]:
+        """Retourne uniquement les membres acceptés."""
+        return [m for m in self._members if m.is_accepted]
+
+    @property
+    def pending_members(self) -> List[Membership]:
+        """Retourne uniquement les demandes en attente."""
+        return [m for m in self._members if m.is_pending]
 
     # =========================================================================
     # DOMAIN EVENTS

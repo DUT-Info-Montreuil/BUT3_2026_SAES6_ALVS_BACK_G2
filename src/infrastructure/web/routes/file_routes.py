@@ -1,20 +1,19 @@
 # src/infrastructure/web/routes/file_routes.py
 """Routes pour la gestion des fichiers avec documentation OpenAPI."""
 
+import os
+from flask import Blueprint, request, jsonify, send_file
 from http import HTTPStatus
 
-from flask import Blueprint, jsonify, request, send_file
-
-from src.application.exceptions import NotFoundException, ValidationException
+from src.infrastructure.web.middlewares.auth_middleware import require_auth, get_current_user_id
+from src.application.exceptions import ValidationException, NotFoundException
 from src.infrastructure.storage.file_storage import get_file_storage
-from src.infrastructure.web.middlewares.auth_middleware import require_auth
-from src.infrastructure.web.middlewares.rate_limiter import limiter
+
 
 file_bp = Blueprint('files', __name__, url_prefix='/api/v1/files')
 
 
 @file_bp.post('/upload')
-@limiter.limit("10 per hour")
 @require_auth
 def upload_file():
     """
@@ -65,19 +64,19 @@ def upload_file():
     """
     if 'file' not in request.files:
         raise ValidationException("Aucun fichier fourni", errors={"file": ["Fichier requis"]})
-
+    
     file = request.files['file']
-
+    
     if file.filename == '':
         raise ValidationException("Nom de fichier vide", errors={"file": ["Nom de fichier requis"]})
-
+    
     try:
         file_data = file.read()
         storage = get_file_storage()
         stored = storage.save(file_data, file.filename)
-
+        
         return jsonify(stored.to_dict()), HTTPStatus.CREATED
-
+        
     except ValueError as e:
         raise ValidationException(str(e), errors={"file": [str(e)]})
 
@@ -115,10 +114,10 @@ def get_file(file_id: str):
     """
     storage = get_file_storage()
     file_path = storage.get_path(file_id)
-
+    
     if not file_path:
         raise NotFoundException(f"Fichier {file_id} non trouve")
-
+    
     return send_file(file_path, as_attachment=True)
 
 
@@ -149,10 +148,10 @@ def delete_file(file_id: str):
         $ref: '#/components/responses/NotFound'
     """
     storage = get_file_storage()
-
+    
     if not storage.delete(file_id):
         raise NotFoundException(f"Fichier {file_id} non trouve")
-
+    
     return '', HTTPStatus.NO_CONTENT
 
 
@@ -183,15 +182,14 @@ def check_file(file_id: str):
         $ref: '#/components/responses/NotFound'
     """
     storage = get_file_storage()
-
+    
     if not storage.exists(file_id):
         raise NotFoundException(f"Fichier {file_id} non trouve")
-
+    
     return '', HTTPStatus.OK
 
 
 @file_bp.put('/<file_id>')
-@limiter.limit("10 per hour")
 @require_auth
 def replace_file(file_id: str):
     """
@@ -251,37 +249,37 @@ def replace_file(file_id: str):
         $ref: '#/components/responses/NotFound'
     """
     storage = get_file_storage()
-
+    
     # Verifier que le fichier existe
     if not storage.exists(file_id):
         raise NotFoundException(f"Fichier {file_id} non trouve")
-
+    
     if 'file' not in request.files:
         raise ValidationException("Aucun fichier fourni", errors={"file": ["Fichier requis"]})
-
+    
     file = request.files['file']
-
+    
     if file.filename == '':
         raise ValidationException("Nom de fichier vide", errors={"file": ["Nom de fichier requis"]})
-
+    
     try:
         # Supprimer l'ancien fichier
         storage.delete(file_id)
-
+        
         # Sauvegarder le nouveau avec le meme ID
         file_data = file.read()
-
+        
         # On doit modifier le service pour supporter un ID personnalise
         # Pour l'instant, on cree un nouveau fichier et on retourne les infos
         stored = storage.save(file_data, file.filename)
-
+        
         # Note: Dans une vraie implementation, on garderait le meme file_id
         # Ici on retourne le nouveau pour l'instant
         result = stored.to_dict()
         result['replaced'] = True
         result['original_id'] = file_id
-
+        
         return jsonify(result), HTTPStatus.OK
-
+        
     except ValueError as e:
         raise ValidationException(str(e), errors={"file": [str(e)]})

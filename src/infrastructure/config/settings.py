@@ -87,6 +87,8 @@ class DevelopmentConfig(Config):
             JWT_ACCESS_TOKEN_EXPIRES=int(os.getenv("JWT_ACCESS_TOKEN_EXPIRES", "900")),
             JWT_REFRESH_TOKEN_EXPIRES=int(os.getenv("JWT_REFRESH_TOKEN_EXPIRES", "2592000")),
             JWT_COOKIE_SECURE=False,  # HTTP autorisé en dev
+            JWT_COOKIE_SAMESITE="Lax",  # Lax en dev (Strict bloque les cookies cross-port)
+            JWT_COOKIE_CSRF_PROTECT=False,  # Pas de CSRF en dev (le proxy Vite le rend inutile)
             CORS_ORIGINS=os.getenv("CORS_ORIGINS", "").split(",") if os.getenv("CORS_ORIGINS") else None,
             RATELIMIT_STORAGE_URL=os.getenv("REDIS_URL"),
             UPLOAD_FOLDER=os.getenv("UPLOAD_FOLDER", "static/uploads"),
